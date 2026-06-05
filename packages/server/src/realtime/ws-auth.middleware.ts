@@ -8,6 +8,8 @@ import { resolveSocketIdentity } from './ws-identity';
 export interface SocketData {
   identity: Identity;
   lobby?: { code: string; playerId: 'A' | 'B' };
+  /** `true`, solange dieser Socket in der Quick-Play-Warteschlange wartet (006, FR-013). */
+  inQueue?: boolean;
 }
 
 /** Socket.IO-Handshake-Middleware: löst die Identität aus den Cookies (research.md §3). */

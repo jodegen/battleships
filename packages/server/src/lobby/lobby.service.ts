@@ -57,6 +57,8 @@ export class LobbyService {
       const created = await this.repo.createIfAbsent(record, WAITING_TTL_MS);
       if (created) {
         await this.repo.addOpenLobby(host.userId, code);
+        // 006/FR-015: konto-weiter Aktiv-Index für den Host.
+        await this.repo.setUserGame(host.userId, code, ACTIVE_TTL_MS);
         return { ok: true, record };
       }
     }
@@ -90,6 +92,8 @@ export class LobbyService {
     }
 
     await this.repo.save(joined.record, ACTIVE_TTL_MS);
+    // 006/FR-015: konto-weiter Aktiv-Index für den eingeloggten Beitretenden (Seat B).
+    if (identity.kind === 'user') await this.repo.setUserGame(identity.userId, code, ACTIVE_TTL_MS);
     return { ok: true, record: joined.record };
   }
 }

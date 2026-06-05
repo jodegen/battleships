@@ -82,6 +82,18 @@ export interface OpponentReconnectedMsg {
   playerId: PlayerId;
 }
 
+/** Quick-Play-Paarung gefunden (006, FR-003/006/007). Push an beide Spieler. */
+export interface QueueMatchedMsg {
+  code: string;
+  you: PlayerId;
+  lobby: LobbyView;
+  reconnectToken: string;
+}
+/** Quick-Play-Wartetimeout ohne Gegner (006, FR-016). */
+export interface QueueTimeoutMsg {
+  reason: 'no-match';
+}
+
 export type Ack<T> = ({ ok: true } & T) | { ok: false; error: string };
 
 /**

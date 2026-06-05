@@ -16,6 +16,7 @@ import {
   type LobbyView,
   type OpponentDisconnectedMsg,
   type PlayerId,
+  type QueueMatchedMsg,
   type ShipPlacement,
   type ShotResultMsg,
   type TurnChangedMsg,
@@ -42,6 +43,10 @@ export interface OnlineGameState {
   opponentDisconnect: OpponentDisconnect | null;
   over: GameOverMsg | null;
   error: string | null;
+  /** Quick Play: Suche läuft (006, FR-002/014). */
+  searching: boolean;
+  /** Quick Play: Wartetimeout ohne Gegner (006, FR-016). */
+  noMatch: boolean;
 }
 
 export interface OnlineGameApi extends OnlineGameState {
@@ -49,6 +54,10 @@ export interface OnlineGameApi extends OnlineGameState {
   joinLobby: (code: string, guestName?: string) => Promise<boolean>;
   placeFleet: (placements: ShipPlacement[]) => Promise<boolean>;
   fireShot: (target: Coord) => Promise<boolean>;
+  /** Quick Play: Match suchen (006, FR-002). */
+  findMatch: () => Promise<void>;
+  /** Quick Play: Suche abbrechen (006, FR-008). */
+  cancelSearch: () => void;
   leave: () => void;
 }
 
@@ -65,6 +74,8 @@ export function useOnlineGame(): OnlineGameApi {
     opponentDisconnect: null,
     over: null,
     error: null,
+    searching: false,
+    noMatch: false,
   });
 
   useEffect(() => {
@@ -91,6 +102,13 @@ export function useOnlineGame(): OnlineGameApi {
       patch({ opponentDisconnect: { playerId: m.playerId, graceDeadline: m.graceDeadline } }),
     );
     socket.on('opponent:reconnected', () => patch({ opponentDisconnect: null }));
+    // Quick Play: Paarung gefunden → wie ein erfolgreicher Beitritt in die bestehende Partie (006).
+    socket.on('queue:matched', (msg: QueueMatchedMsg) => {
+      codeRef.current = msg.code;
+      saveReconnect({ code: msg.code, token: msg.reconnectToken, playerId: msg.you });
+      patch({ lobby: msg.lobby, searching: false, noMatch: false, error: null });
+    });
+    socket.on('queue:timeout', () => patch({ searching: false, noMatch: true }));
     socket.on('game:over', (over: GameOverMsg) => {
       clearReconnect(); // Partie beendet → Reconnect-Token verwerfen (005)
       patch({ over, opponentDisconnect: null });
@@ -161,6 +179,18 @@ export function useOnlineGame(): OnlineGameApi {
     [emit],
   );
 
+  const findMatch = useCallback(async (): Promise<void> => {
+    setState((s) => ({ ...s, searching: true, noMatch: false, error: null }));
+    const ack = await emit<{ status: 'waiting' | 'matched' }>('queue:join', {});
+    // Bei Erfolg bleibt `searching` aktiv, bis `queue:matched` eintrifft; nur Fehler beenden die Suche.
+    if (!ack.ok) setState((s) => ({ ...s, searching: false, error: ack.error }));
+  }, [emit]);
+
+  const cancelSearch = useCallback((): void => {
+    void socketRef.current?.emit('queue:leave', {});
+    setState((s) => ({ ...s, searching: false, noMatch: false }));
+  }, []);
+
   const leave = useCallback((): void => {
     const code = codeRef.current;
     if (code) void socketRef.current?.emit('lobby:leave', { code });
@@ -168,5 +198,5 @@ export function useOnlineGame(): OnlineGameApi {
     codeRef.current = null;
   }, []);
 
-  return { ...state, createLobby, joinLobby, placeFleet, fireShot, leave };
+  return { ...state, createLobby, joinLobby, placeFleet, fireShot, findMatch, cancelSearch, leave };
 }

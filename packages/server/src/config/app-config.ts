@@ -23,6 +23,8 @@ export interface AppConfig {
   readonly joinRateLimitMaxFails: number;
   /** Reconnect-Fenster in ms: reservierter Sitz nach Verbindungsabbruch (005, FR-006). */
   readonly reconnectWindowMs: number;
+  /** Wartetimeout der Quick-Play-Suche in ms (006, FR-016). Default 120_000. */
+  readonly matchmakingTimeoutMs: number;
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -57,5 +59,6 @@ export function loadAppConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     joinRateLimitWindowSeconds: intFromEnv(env, 'JOIN_RATE_LIMIT_WINDOW_SECONDS', 60),
     joinRateLimitMaxFails: intFromEnv(env, 'JOIN_RATE_LIMIT_MAX_FAILS', 10),
     reconnectWindowMs: intFromEnv(env, 'RECONNECT_WINDOW_MS', 60_000),
+    matchmakingTimeoutMs: intFromEnv(env, 'MATCHMAKING_TIMEOUT_MS', 120_000),
   };
 }

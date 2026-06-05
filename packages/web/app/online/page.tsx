@@ -10,6 +10,7 @@ import { useIdentity } from '../../src/auth/useIdentity';
 import { LobbyPanel } from '../../src/components/online/LobbyPanel';
 import { OnlineBoards } from '../../src/components/online/OnlineBoards';
 import { OpponentStatus } from '../../src/components/online/OpponentStatus';
+import { QuickPlayPanel } from '../../src/components/online/QuickPlayPanel';
 import { TurnTimer } from '../../src/components/online/TurnTimer';
 import { useOnlineGame } from '../../src/realtime/useOnlineGame';
 import type { ShipPlacement } from '../../src/realtime/socket-client';
@@ -30,6 +31,7 @@ export default function OnlinePage(): JSX.Element {
   const [placedSent, setPlacedSent] = useState(false);
 
   const isGuest = identity?.kind === 'guest';
+  const isLoggedIn = identity?.kind === 'user';
   const myName = identity && identity.kind !== 'anonymous' ? identity.displayName : null;
   const you = game.view?.you ?? game.lobby?.players.find((p) => p.displayName === myName)?.playerId ?? null;
   const myTurn = Boolean(game.view && game.lobby?.turn === game.view.you);
@@ -55,12 +57,23 @@ export default function OnlinePage(): JSX.Element {
       <p>{headerStatus}</p>
 
       {!game.lobby && (
-        <LobbyPanel
-          isGuest={Boolean(isGuest)}
-          error={game.error}
-          onCreate={(s) => void game.createLobby(s)}
-          onJoin={(c, name) => void game.joinLobby(c, name)}
-        />
+        <div style={{ display: 'flex', gap: 32, flexWrap: 'wrap' }}>
+          {/* Quick Play nur für eingeloggte Spieler (FR-001); Gäste spielen PvP per Code. */}
+          {isLoggedIn && (
+            <QuickPlayPanel
+              searching={game.searching}
+              noMatch={game.noMatch}
+              onFind={() => void game.findMatch()}
+              onCancel={() => game.cancelSearch()}
+            />
+          )}
+          <LobbyPanel
+            isGuest={Boolean(isGuest)}
+            error={game.error}
+            onCreate={(s) => void game.createLobby(s)}
+            onJoin={(c, name) => void game.joinLobby(c, name)}
+          />
+        </div>
       )}
 
       {game.lobby && (
