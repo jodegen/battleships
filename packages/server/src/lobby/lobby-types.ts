@@ -21,6 +21,10 @@ export interface Seat {
   readonly identity: SeatIdentity;
   readonly connected: boolean;
   readonly placed: boolean;
+  /** Geheimes Per-Seat-Reconnect-Token (005, FR-001). Verlässt den Server nur im create/join-Ack. */
+  readonly reconnectToken: string;
+  /** Absolute ms-Deadline des 60-s-Reconnect-Fensters; `null`, solange verbunden (005, FR-006). */
+  readonly reconnectDeadline: number | null;
 }
 
 export interface LobbyRecord {
@@ -39,6 +43,10 @@ export interface LobbyRecord {
   readonly matchKey: string;
   readonly createdAt: number;
   readonly startedAt: number | null;
+  /** Bei Pause festgehaltene Zug-Restzeit (ms); `null` wenn kein aktiver Timer/nicht pausiert (005, FR-012). */
+  readonly pausedTurnRemainingMs: number | null;
+  /** `true`, solange ein Sitz während `in_progress` getrennt ist — sperrt Züge (005, FR-005). */
+  readonly paused: boolean;
 }
 
 export function isGuestIdentity(id: SeatIdentity): id is Extract<SeatIdentity, { kind: 'guest' }> {

@@ -6,6 +6,7 @@ import { isAllowedDisplayName } from '../auth/display-name';
 import { APP_CONFIG } from '../config/config.module';
 import type { AppConfig } from '../config/app-config';
 import type { ErrorCode, LobbySettings } from '../realtime/events';
+import { createReconnectToken } from '../reconnect/reconnect-token';
 import { generateLobbyCode, isValidLobbyCode, normalizeLobbyCode } from './lobby-code';
 import { createLobbyRecord, joinAsSecond } from './lobby-state';
 import { LobbyRepository } from './lobby.repository';
@@ -50,6 +51,7 @@ export class LobbyService {
         host: { kind: 'user', userId: host.userId, displayName: host.displayName },
         settings,
         matchKey: randomUUID(),
+        reconnectToken: createReconnectToken(),
         now,
       });
       const created = await this.repo.createIfAbsent(record, WAITING_TTL_MS);
@@ -81,7 +83,7 @@ export class LobbyService {
       return { ok: false, error: 'lobby-not-found' };
     }
 
-    const joined = joinAsSecond(record, identity);
+    const joined = joinAsSecond(record, identity, createReconnectToken());
     if (!joined.ok) {
       const error: ErrorCode = joined.error === 'lobby-full' ? 'lobby-full' : 'lobby-not-found';
       return { ok: false, error };

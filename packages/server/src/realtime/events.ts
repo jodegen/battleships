@@ -38,6 +38,7 @@ export type ErrorCode =
   | 'out-of-bounds'
   | 'not-in-progress'
   | 'invalid-name'
+  | 'game-finished'
   | 'internal-error';
 
 export type Ack<T> = ({ readonly ok: true } & T) | { readonly ok: false; readonly error: ErrorCode };
@@ -80,7 +81,7 @@ export interface ShotResultMsg {
   readonly sunkShip?: { readonly length: number };
 }
 
-export type TurnChangeReason = 'shot' | 'miss' | 'timeout' | 'extra-turn' | 'start';
+export type TurnChangeReason = 'shot' | 'miss' | 'timeout' | 'extra-turn' | 'start' | 'resume';
 
 export interface TurnChangedMsg {
   readonly code: string;
@@ -93,6 +94,19 @@ export interface GameOverMsg {
   readonly code: string;
   readonly winner: PlayerId;
   readonly reason: 'all-sunk' | 'forfeit';
+}
+
+/** Gegner getrennt — Reconnect-Fenster läuft (005, FR-007). `graceDeadline` für den Countdown. */
+export interface OpponentDisconnectedMsg {
+  readonly code: string;
+  readonly playerId: PlayerId;
+  readonly graceDeadline: number;
+}
+
+/** Gegner innerhalb des Fensters zurück (005, FR-010). */
+export interface OpponentReconnectedMsg {
+  readonly code: string;
+  readonly playerId: PlayerId;
 }
 
 // ── Client→Server Intent-Payloads ────────────────────────────────────────────
@@ -116,6 +130,10 @@ export interface FireShotPayload {
 export interface LobbyRefPayload {
   readonly code: string;
 }
+export interface ReconnectResumePayload {
+  readonly code: string;
+  readonly token: string;
+}
 
 // ── Event-Namen (Single Source der String-Konstanten) ─────────────────────────
 
@@ -125,6 +143,7 @@ export const ClientEvents = {
   leaveLobby: 'lobby:leave',
   placeFleet: 'fleet:place',
   fireShot: 'shot:fire',
+  reconnectResume: 'reconnect:resume',
 } as const;
 
 export const ServerEvents = {
@@ -134,10 +153,13 @@ export const ServerEvents = {
   turnChanged: 'turn:changed',
   timerExpired: 'timer:expired',
   gameOver: 'game:over',
+  opponentDisconnected: 'opponent:disconnected',
+  opponentReconnected: 'opponent:reconnected',
   error: 'error',
 } as const;
 
 export type FireShotAck = Ack<{ result: ShotResult }>;
-export type CreateLobbyAck = Ack<{ code: string; lobby: LobbyView }>;
-export type JoinLobbyAck = Ack<{ lobby: LobbyView }>;
+export type CreateLobbyAck = Ack<{ code: string; lobby: LobbyView; reconnectToken: string }>;
+export type JoinLobbyAck = Ack<{ lobby: LobbyView; reconnectToken: string }>;
 export type PlaceFleetAck = Ack<{ reason?: string }>;
+export type ReconnectResumeAck = Ack<{ you: PlayerId }>;

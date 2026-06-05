@@ -20,9 +20,11 @@ function startedGame(settings: LobbySettings): { record: LobbyRecord; bCells: { 
       host: { kind: 'user', userId: 'u1', displayName: 'A' },
       settings,
       matchKey: 'mk',
+      reconnectToken: 'rt-a',
       now: 0,
     }),
     { kind: 'user', userId: 'u2', displayName: 'B' },
+    'rt-b',
   );
   if (!rec.ok) throw new Error('join');
   let record = setPlaced(setPlaced(rec.record, 'A', fa.ships), 'B', fb.ships);

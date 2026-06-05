@@ -70,7 +70,12 @@ export default function OnlinePage(): JSX.Element {
               Code zum Teilen: <strong>{code}</strong>
             </p>
           )}
-          <OpponentStatus lobby={game.lobby} you={you} />
+          <OpponentStatus
+            lobby={game.lobby}
+            you={you}
+            opponentDisconnect={game.opponentDisconnect}
+            selfReconnecting={game.selfReconnecting}
+          />
         </>
       )}
 

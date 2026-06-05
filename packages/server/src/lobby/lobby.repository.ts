@@ -3,9 +3,21 @@ import { Injectable } from '@nestjs/common';
 import { RedisService } from '../redis/redis.service';
 import type { LobbyRecord } from './lobby-types';
 
+import type { PlayerId } from '@schiffe/engine';
+
 const lobbyKey = (code: string): string => `lobby:${code}`;
 const openKey = (userId: string): string => `open-lobbies:${userId}`;
 const joinFailKey = (idKey: string): string => `join-fails:${idKey}`;
+const matchResultKey = (code: string): string => `match-result:${code}`;
+
+/** Flüchtiger Terminal-Marker (005, FR-017): verspäteter Reconnect erfährt das Endergebnis. */
+export interface TerminalResult {
+  readonly winner: PlayerId;
+  readonly reason: 'forfeit' | 'all-sunk';
+  readonly endedAt: number;
+}
+
+const MATCH_RESULT_TTL_MS = 120_000;
 
 export type UpdateResult =
   | { readonly status: 'ok'; readonly record: LobbyRecord }
@@ -77,6 +89,16 @@ export class LobbyRepository {
       return next === null ? { status: 'closed' } : { status: 'ok', record: next };
     }
     return { status: 'conflict' };
+  }
+
+  // ── Reconnect: Terminal-Marker für verspäteten Wiedereintritt (005, FR-017) ──
+
+  async setMatchResult(code: string, result: TerminalResult): Promise<void> {
+    await this.redis.client.set(matchResultKey(code), JSON.stringify(result), 'PX', MATCH_RESULT_TTL_MS);
+  }
+  async getMatchResult(code: string): Promise<TerminalResult | null> {
+    const raw = await this.redis.client.get(matchResultKey(code));
+    return raw ? (JSON.parse(raw) as TerminalResult) : null;
   }
 
   // ── Anti-Abuse: Obergrenze offener Lobbys pro Nutzer (FR-006b) ───────────────
