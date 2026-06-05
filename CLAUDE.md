@@ -1,24 +1,28 @@
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan:
-`specs/004-pvp-realtime-lobbies/plan.md`
+`specs/005-reconnect-handling/plan.md`
 
-Active feature: **PvP-Lobbys & Echtzeit-Online-Partie (004, Meilenstein 3)** — erweitert
-`packages/server` (NestJS) um einen **Socket.IO**-WebSocket-Layer (ein Raum pro Lobby) und
-**Redis** (aktiver Lobby-/Spielzustand, Presence, Pub/Sub via `@socket.io/redis-adapter` →
-mehr-instanz-fähig; Lastziel bleibt Einzelinstanz). Die bestehende **Engine** (`@schiffe/engine`)
-ist die **einzige** Spiellogik: `createGame`/`applyShot`/`resolveShot`/`viewFor` laufen
-serverseitig (server-autoritativ). **Fog of War** strukturell über `viewFor` — ungetroffene
-gegnerische Schiffe verlassen den Server nie. Lobby-Lebenszyklus
-`waiting→placing→in_progress→finished` mit Einstellungen (Berührung, Zug-Timer 15/30/60/aus,
-Extrazug). Serverseitiger **Zug-Timer** (Deadline im Redis-State). Idempotente Züge über `moveId`.
-Beendete Partien → neue Prisma-Modelle **`Match`/`MatchMove`** (Spec §9) + idempotente
-**Stats**-Fortschreibung eingeloggter Spieler (Gäste: keine Statistik). `packages/web` erhält
-schlichte Online-Screens (Lobby, Platzierung, Online-Brett, Countdown). TDD für reine Serverlogik
-(Zustandsmaschine, Fog of War, Timer, Idempotenz) + `socket.io-client`-Integration; Redis lokal
-via Docker Compose. **Löst die in M2 dokumentierte Prinzip-I-Abweichung auf.**
+Active feature: **Reconnect-Handling für laufende PvP-Partien (005, Meilenstein 4)** — additiv
+über 004. Ein Verbindungsabbruch während `in_progress` beendet die Partie **nicht mehr sofort**
+(löst die 004-Übergangsregel FR-010a ab), sondern reserviert den Sitz **60 s**: Disconnect-Zweig im
+`GameGateway` markiert den Sitz `connected:false`, setzt eine **Grace-Deadline** im
+Redis-`LobbyRecord` und **pausiert den Zug-Timer** (`pausedTurnRemainingMs`, `turnDeadline=null`).
+Pro Sitz erzeugt der Server ein **Reconnect-Token** (im Seat, an den Client im create/join-Ack).
+Neuer Intent **`reconnect:resume {code,token}`** ordnet den Socket Raum/Sitz wieder zu — autorisiert
+per Token **oder** per eingeloggter Identität (FR-003a: konto-weit/jedes Gerät; Gäste nur per Token
+aus `localStorage`). Wiederherstellung der sichtbaren Sicht **ausschließlich** über das bestehende
+`projectGameView`→`viewFor` (Fog of War strukturell gewahrt). Bei beidseitiger Verbindung läuft der
+Zug-Timer mit **Restzeit** weiter. Fenster-Ablauf → **Aufgabe** via per-Seat `GraceTimerService`
+über den **bestehenden** `finishAndPersist`-Pfad (`MatchStatus.FORFEITED`, idempotente Stats);
+beidseitige Trennung → **erstes Fenster entscheidet** (FR-014a). **Keine Engine-Änderung, keine
+Prisma-Migration.** `packages/web`: Token reload-fest in `localStorage`, Auto-Reconnect, Gegner-
+Countdown „Gegner getrennt – wartet (xx s)". TDD für `reconnect-state`/`reconnect-token` +
+`socket.io-client`-Integration (Timer-Pause, State-Restore ohne Leak, Aufgabe nach 60 s, beide
+getrennt; `now()` injiziert).
 
-Vorherige Features: **Identität & Persistenz (003, M2)** — `packages/server`, fertig.
+Vorherige Features: **PvP-Lobbys & Echtzeit-Online-Partie (004, M3)** — `packages/server`/`web`, fertig.
+**Identität & Persistenz (003, M2)** — `packages/server`, fertig.
 **Minimal spielbares Frontend gegen die KI (002)** — `packages/web`, fertig.
 **Spiel-Engine & KI (Meilenstein 1, 001)** — `packages/engine`, fertig.
 <!-- SPECKIT END -->

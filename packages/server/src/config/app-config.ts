@@ -21,6 +21,8 @@ export interface AppConfig {
   readonly joinRateLimitWindowSeconds: number;
   /** Maximale fehlgeschlagene Beitritts-Versuche im Fenster, danach Drosselung (FR-006a). */
   readonly joinRateLimitMaxFails: number;
+  /** Reconnect-Fenster in ms: reservierter Sitz nach Verbindungsabbruch (005, FR-006). */
+  readonly reconnectWindowMs: number;
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -54,5 +56,6 @@ export function loadAppConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     maxOpenLobbiesPerUser: intFromEnv(env, 'MAX_OPEN_LOBBIES_PER_USER', 5),
     joinRateLimitWindowSeconds: intFromEnv(env, 'JOIN_RATE_LIMIT_WINDOW_SECONDS', 60),
     joinRateLimitMaxFails: intFromEnv(env, 'JOIN_RATE_LIMIT_MAX_FAILS', 10),
+    reconnectWindowMs: intFromEnv(env, 'RECONNECT_WINDOW_MS', 60_000),
   };
 }

@@ -19,6 +19,7 @@ function service(overrides: Partial<AppConfig> = {}): GuestTokenService {
     maxOpenLobbiesPerUser: 5,
     joinRateLimitWindowSeconds: 60,
     joinRateLimitMaxFails: 10,
+    reconnectWindowMs: 60_000,
     ...overrides,
   } satisfies AppConfig;
   return new GuestTokenService(config);

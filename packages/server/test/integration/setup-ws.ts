@@ -2,11 +2,14 @@ import type { AddressInfo } from 'node:net';
 
 import { type INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import { createRng, generateFleet, type ShipPlacement } from '@schiffe/engine';
 import cookieParser from 'cookie-parser';
 import { io, type Socket } from 'socket.io-client';
 import request from 'supertest';
 
 import { AppModule } from '../../src/app.module';
+import { settingsToGameConfig } from '../../src/game/game-config';
+import type { LobbySettings } from '../../src/realtime/events';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { RedisService } from '../../src/redis/redis.service';
 
@@ -89,3 +92,71 @@ export function waitFor<T = unknown>(socket: Socket, name: string, timeoutMs = 2
 export async function flushRedis(redis: RedisService): Promise<void> {
   await redis.client.flushdb();
 }
+
+export interface StartedGame {
+  readonly code: string;
+  readonly host: Socket;
+  readonly guest: Socket;
+  readonly hostCookie: string;
+  readonly guestCookie: string;
+  readonly hostToken: string;
+  readonly guestToken: string;
+  readonly hostEmail: string;
+  readonly guestEmail: string;
+  readonly fa: ShipPlacement[];
+  readonly fb: ShipPlacement[];
+}
+
+const DEFAULT_GAME_SETTINGS: LobbySettings = {
+  allowTouching: true,
+  turnTimerSeconds: null,
+  extraTurnOnHit: true,
+};
+
+/** Bringt zwei eingeloggte Spieler bis `in_progress` (Host A am Zug). Liefert Codes/Tokens/Fleets. */
+export async function startGame(
+  ctx: WsContext,
+  settings: LobbySettings = DEFAULT_GAME_SETTINGS,
+  emails: { host: string; guest: string } = { host: 'host@x.com', guest: 'guest@x.com' },
+): Promise<StartedGame> {
+  const hostCookie = await registerCookie(ctx.app, emails.host, 'Alice');
+  const guestCookie = await registerCookie(ctx.app, emails.guest, 'Bob');
+
+  const host = await connect(ctx.port, hostCookie);
+  const create = (await host.emitWithAck('lobby:create', { settings })) as {
+    ok: boolean;
+    code: string;
+    reconnectToken: string;
+  };
+  const guest = await connect(ctx.port, guestCookie);
+  const join = (await guest.emitWithAck('lobby:join', { code: create.code })) as {
+    ok: boolean;
+    reconnectToken: string;
+  };
+
+  const cfg = settingsToGameConfig(settings);
+  const fa = generateFleet(cfg, createRng(7));
+  const fb = generateFleet(cfg, createRng(99));
+  if (!fa.ok || !fb.ok) throw new Error('fleet');
+
+  await host.emitWithAck('fleet:place', { code: create.code, placements: fa.ships });
+  const started = waitFor(host, 'turn:changed');
+  await guest.emitWithAck('fleet:place', { code: create.code, placements: fb.ships });
+  await started;
+
+  return {
+    code: create.code,
+    host,
+    guest,
+    hostCookie,
+    guestCookie,
+    hostToken: create.reconnectToken,
+    guestToken: join.reconnectToken,
+    hostEmail: emails.host,
+    guestEmail: emails.guest,
+    fa: fa.ships,
+    fb: fb.ships,
+  };
+}
+
+export const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));

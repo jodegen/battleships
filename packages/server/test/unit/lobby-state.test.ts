@@ -19,6 +19,7 @@ function baseLobby() {
     host: { kind: 'user', userId: 'u1', displayName: 'Alice' },
     settings: SETTINGS,
     matchKey: 'mk-1',
+    reconnectToken: 'rt-a',
     now: 1000,
   });
 }
@@ -32,7 +33,7 @@ describe('Lobby-Zustandsmaschine (FR-007–011a)', () => {
   });
 
   it('zweiter Spieler → Seat B, Übergang zu `placing` (FR-008)', () => {
-    const r = joinAsSecond(baseLobby(), { kind: 'guest', displayName: 'Bob' });
+    const r = joinAsSecond(baseLobby(), { kind: 'guest', displayName: 'Bob' }, 'rt-b');
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.record.status).toBe('placing');
@@ -41,21 +42,21 @@ describe('Lobby-Zustandsmaschine (FR-007–011a)', () => {
   });
 
   it('Drittbeitritt wird abgelehnt (FR-004)', () => {
-    const joined = joinAsSecond(baseLobby(), { kind: 'guest', displayName: 'Bob' });
+    const joined = joinAsSecond(baseLobby(), { kind: 'guest', displayName: 'Bob' }, 'rt-b');
     expect(joined.ok).toBe(true);
     if (!joined.ok) return;
-    const third = joinAsSecond(joined.record, { kind: 'guest', displayName: 'Eve' });
+    const third = joinAsSecond(joined.record, { kind: 'guest', displayName: 'Eve' }, 'rt-c');
     expect(third).toEqual({ ok: false, error: 'lobby-full' });
   });
 
   it('Host-Austritt VOR Spielstart schließt die Lobby (FR-011a)', () => {
-    const joined = joinAsSecond(baseLobby(), { kind: 'guest', displayName: 'Bob' });
+    const joined = joinAsSecond(baseLobby(), { kind: 'guest', displayName: 'Bob' }, 'rt-b');
     if (!joined.ok) return;
     expect(removeBeforeStart(joined.record, 'A')).toBeNull();
   });
 
   it('Austritt des zweiten Spielers gibt Sitz frei → zurück zu `waiting` (FR-011a)', () => {
-    const joined = joinAsSecond(baseLobby(), { kind: 'guest', displayName: 'Bob' });
+    const joined = joinAsSecond(baseLobby(), { kind: 'guest', displayName: 'Bob' }, 'rt-b');
     if (!joined.ok) return;
     const back = removeBeforeStart(joined.record, 'B');
     expect(back).not.toBeNull();
@@ -65,7 +66,7 @@ describe('Lobby-Zustandsmaschine (FR-007–011a)', () => {
   });
 
   it('bothPlaced erst, wenn beide Seiten platziert haben (FR-009)', () => {
-    const joined = joinAsSecond(baseLobby(), { kind: 'guest', displayName: 'Bob' });
+    const joined = joinAsSecond(baseLobby(), { kind: 'guest', displayName: 'Bob' }, 'rt-b');
     if (!joined.ok) return;
     let rec = joined.record;
     expect(bothPlaced(rec)).toBe(false);
@@ -83,7 +84,7 @@ describe('Lobby-Zustandsmaschine (FR-007–011a)', () => {
   });
 
   it('toLobbyView spiegelt Status, Spieler und Gast-Flag', () => {
-    const joined = joinAsSecond(baseLobby(), { kind: 'guest', displayName: 'Bob' });
+    const joined = joinAsSecond(baseLobby(), { kind: 'guest', displayName: 'Bob' }, 'rt-b');
     if (!joined.ok) return;
     const view = toLobbyView(joined.record);
     expect(view.status).toBe('placing');

@@ -19,6 +19,9 @@ npm-debug.log*
 # Env
 .env
 .env.*
+# Beispiel-Konfigurationen sind einzuchecken (enthalten keine Secrets).
+!.env.example
+!.env.*.example
 
 # OS / editor
 .DS_Store

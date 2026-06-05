@@ -13,11 +13,13 @@ function record(secondGuest: boolean): LobbyRecord {
     host: { kind: 'user', userId: 'host-1', displayName: 'Alice' },
     settings: SETTINGS,
     matchKey: 'mk-42',
+    reconnectToken: 'rt-a',
     now: 1000,
   });
   const joined = joinAsSecond(
     base,
     secondGuest ? { kind: 'guest', displayName: 'Gast' } : { kind: 'user', userId: 'user-2', displayName: 'Bob' },
+    'rt-b',
   );
   if (!joined.ok) throw new Error('join failed');
   const moves: MoveLogEntry[] = [

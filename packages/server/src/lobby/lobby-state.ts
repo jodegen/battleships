@@ -11,9 +11,17 @@ export function createLobbyRecord(args: {
   host: Extract<SeatIdentity, { kind: 'user' }>;
   settings: LobbySettings;
   matchKey: string;
+  reconnectToken: string;
   now: number;
 }): LobbyRecord {
-  const hostSeat: Seat = { playerId: 'A', identity: args.host, connected: true, placed: false };
+  const hostSeat: Seat = {
+    playerId: 'A',
+    identity: args.host,
+    connected: true,
+    placed: false,
+    reconnectToken: args.reconnectToken,
+    reconnectDeadline: null,
+  };
   return {
     code: args.code,
     status: 'waiting',
@@ -29,6 +37,8 @@ export function createLobbyRecord(args: {
     matchKey: args.matchKey,
     createdAt: args.now,
     startedAt: null,
+    pausedTurnRemainingMs: null,
+    paused: false,
   };
 }
 
@@ -37,12 +47,19 @@ export type JoinResult =
   | { readonly ok: false; readonly error: 'lobby-full' | 'not-waiting' };
 
 /** Zweiter Spieler tritt bei → Seat B, Übergang waiting→placing (FR-008). */
-export function joinAsSecond(record: LobbyRecord, identity: SeatIdentity): JoinResult {
+export function joinAsSecond(record: LobbyRecord, identity: SeatIdentity, reconnectToken: string): JoinResult {
   // Voll geht vor Phase: ein dritter Beitritt zu einer bereits besetzten Lobby ist „full",
   // unabhängig davon, ob sie schon platziert/läuft (FR-004).
   if (record.seats.length >= 2) return { ok: false, error: 'lobby-full' };
   if (record.status !== 'waiting') return { ok: false, error: 'not-waiting' };
-  const secondSeat: Seat = { playerId: 'B', identity, connected: true, placed: false };
+  const secondSeat: Seat = {
+    playerId: 'B',
+    identity,
+    connected: true,
+    placed: false,
+    reconnectToken,
+    reconnectDeadline: null,
+  };
   return {
     ok: true,
     record: { ...record, seats: [...record.seats, secondSeat], status: 'placing' },

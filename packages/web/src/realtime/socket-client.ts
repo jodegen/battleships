@@ -70,11 +70,32 @@ export interface GameOverMsg {
   winner: PlayerId;
   reason: 'all-sunk' | 'forfeit';
 }
+/** Gegner getrennt — Reconnect-Fenster läuft (005, FR-007). */
+export interface OpponentDisconnectedMsg {
+  code: string;
+  playerId: PlayerId;
+  graceDeadline: number;
+}
+/** Gegner innerhalb des Fensters zurück (005, FR-010). */
+export interface OpponentReconnectedMsg {
+  code: string;
+  playerId: PlayerId;
+}
 
 export type Ack<T> = ({ ok: true } & T) | { ok: false; error: string };
 
-/** Stellt eine Verbindung her (same-origin, Cookies). `url` optional für Tests/abweichende Hosts. */
+/**
+ * Stellt eine Verbindung her (same-origin, Cookies). `url` optional für Tests/abweichende Hosts.
+ * socket.io reconnectet den Transport automatisch (Default); der Wiedereintritt in die laufende
+ * Partie (`reconnect:resume`) wird in `useOnlineGame` beim `connect`-Event ausgelöst (005).
+ */
 export function createSocket(url?: string): Socket {
   const target = url ?? process.env.NEXT_PUBLIC_WS_URL ?? '';
-  return io(target, { path: '/socket.io', withCredentials: true, transports: ['websocket'], autoConnect: true });
+  return io(target, {
+    path: '/socket.io',
+    withCredentials: true,
+    transports: ['websocket'],
+    autoConnect: true,
+    reconnection: true,
+  });
 }

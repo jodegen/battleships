@@ -17,10 +17,14 @@ import type { AppConfig } from '../config/app-config';
 import { GameService } from '../game/game.service';
 import { TurnTimerService } from '../game/turn-timer.service';
 import { projectGameView } from '../game/fog-of-war';
+import { GraceTimerService } from '../reconnect/grace-timer.service';
+import { markDisconnected, markReconnected, resolveAbandon } from '../reconnect/reconnect-state';
+import { authorizeResume } from '../reconnect/reconnect-token';
 import { CreateLobbyDto } from '../lobby/dto/create-lobby.dto';
 import { FireShotDto } from '../lobby/dto/fire-shot.dto';
 import { JoinLobbyDto } from '../lobby/dto/join-lobby.dto';
 import { PlaceFleetDto } from '../lobby/dto/place-fleet.dto';
+import { ReconnectResumeDto } from '../lobby/dto/reconnect-resume.dto';
 import { removeBeforeStart, setPlaced, toLobbyView } from '../lobby/lobby-state';
 import { LobbyRepository } from '../lobby/lobby.repository';
 import { LobbyService } from '../lobby/lobby.service';
@@ -32,13 +36,14 @@ import {
   type FireShotAck,
   type JoinLobbyAck,
   type PlaceFleetAck,
+  type ReconnectResumeAck,
   ServerEvents,
 } from './events';
 import { createWsAuthMiddleware, type SocketData } from './ws-auth.middleware';
 import { validatePayload } from './validate-payload';
 
-function opponentOf(p: PlayerId): PlayerId {
-  return p === 'A' ? 'B' : 'A';
+function tokenOf(record: LobbyRecord, playerId: PlayerId): string {
+  return record.seats.find((s) => s.playerId === playerId)?.reconnectToken ?? '';
 }
 
 @WebSocketGateway({ cors: { origin: true, credentials: true } })
@@ -50,6 +55,7 @@ export class GameGateway implements OnGatewayInit, OnGatewayDisconnect {
     private readonly repo: LobbyRepository,
     private readonly game: GameService,
     private readonly timer: TurnTimerService,
+    private readonly grace: GraceTimerService,
     private readonly matches: MatchService,
     private readonly sessions: SessionService,
     private readonly guests: GuestTokenService,
@@ -85,7 +91,7 @@ export class GameGateway implements OnGatewayInit, OnGatewayDisconnect {
 
     await socket.join(res.record.code);
     (socket.data as SocketData).lobby = { code: res.record.code, playerId: 'A' };
-    return { ok: true, code: res.record.code, lobby: toLobbyView(res.record) };
+    return { ok: true, code: res.record.code, lobby: toLobbyView(res.record), reconnectToken: tokenOf(res.record, 'A') };
   }
 
   // ── US1: Lobby beitreten (FR-003) ────────────────────────────────────────────
@@ -105,7 +111,7 @@ export class GameGateway implements OnGatewayInit, OnGatewayDisconnect {
     await socket.join(res.record.code);
     (socket.data as SocketData).lobby = { code: res.record.code, playerId: 'B' };
     this.broadcastLobbyState(res.record);
-    return { ok: true, lobby: toLobbyView(res.record) };
+    return { ok: true, lobby: toLobbyView(res.record), reconnectToken: tokenOf(res.record, 'B') };
   }
 
   private resolveJoinIdentity(identity: Identity, guestName?: string): SeatIdentity | null {
@@ -172,6 +178,12 @@ export class GameGateway implements OnGatewayInit, OnGatewayDisconnect {
     const result = await this.repo.update(
       parsed.value.code,
       (rec) => {
+        // FR-005: Während ein Spieler im Reconnect-Fenster getrennt ist, ist die Partie pausiert
+        // und nimmt keine Züge an.
+        if (rec.paused) {
+          captured = { kind: 'rejected', error: 'not-in-progress' };
+          return rec;
+        }
         const app = this.game.applyShot(rec, seat.playerId, parsed.value.moveId, target, this.now());
         captured = app;
         return app.kind === 'applied' ? app.record : rec;
@@ -235,7 +247,64 @@ export class GameGateway implements OnGatewayInit, OnGatewayDisconnect {
     this.armTimer(result.record);
   }
 
-  // ── US1/US3: Verlassen & Disconnect (FR-010a/011a) ───────────────────────────
+  // ── 005: Wiederverbinden in eine laufende Partie (FR-002/008/009/010/012/017) ─
+  @SubscribeMessage(ClientEvents.reconnectResume)
+  async onResume(socket: Socket, raw: unknown): Promise<ReconnectResumeAck> {
+    const parsed = validatePayload(ReconnectResumeDto, raw);
+    if (!parsed.ok) return { ok: false, error: 'invalid-code' };
+    const { code, token } = parsed.value;
+
+    const record = await this.repo.get(code);
+    // Kein aktiver/bereits beendeter Record → ggf. Endergebnis aus dem Terminal-Marker (FR-017).
+    if (!record || record.status === 'finished') return this.resumeTerminal(socket, code);
+
+    const identity = this.identityOf(socket);
+    const seat = record.seats.find((s) => authorizeResume(s, token, identity));
+    if (!seat) return { ok: false, error: 'forbidden' }; // FR-002
+
+    await socket.join(code);
+    (socket.data as SocketData).lobby = { code, playerId: seat.playerId };
+    this.grace.clear(code, seat.playerId);
+
+    const result = await this.repo.update(
+      code,
+      (rec) => markReconnected(rec, seat.playerId, this.now()),
+      this.lobby.ttlFor('in_progress'),
+    );
+    if (result.status !== 'ok') return { ok: false, error: 'lobby-not-found' };
+    const rec = result.record;
+
+    // Sichtbaren Teilzustand AUSSCHLIESSLICH über viewFor wiederherstellen (FR-008/009/020).
+    if (rec.game) {
+      socket.emit(ServerEvents.gameView, projectGameView(code, rec.game, seat.playerId, rec.turnDeadline));
+    }
+    this.broadcastLobbyState(rec);
+    this.server.to(code).emit(ServerEvents.opponentReconnected, { code, playerId: seat.playerId });
+
+    // Sind beide verbunden → Pause aufheben, Zug-Timer mit Restzeit fortsetzen (FR-010/012).
+    if (rec.status === 'in_progress' && rec.game && rec.seats.every((s) => s.connected)) {
+      this.server.to(code).emit(ServerEvents.turnChanged, {
+        code,
+        turn: rec.game.turn,
+        turnDeadline: rec.turnDeadline,
+        reason: 'resume',
+      });
+      this.armTimer(rec);
+    }
+    return { ok: true, you: seat.playerId };
+  }
+
+  /** Verspäteter Reconnect: Endergebnis aus dem flüchtigen Marker, kein Wiedereintritt (FR-017). */
+  private async resumeTerminal(socket: Socket, code: string): Promise<ReconnectResumeAck> {
+    const marker = await this.repo.getMatchResult(code);
+    if (marker) {
+      socket.emit(ServerEvents.gameOver, { code, winner: marker.winner, reason: marker.reason });
+      return { ok: false, error: 'game-finished' };
+    }
+    return { ok: false, error: 'lobby-not-found' };
+  }
+
+  // ── 005: Verlassen & Disconnect (löst FR-010a ab: Pause+Grace statt Forfeit) ──
   @SubscribeMessage(ClientEvents.leaveLobby)
   async onLeave(socket: Socket): Promise<{ ok: true }> {
     await this.handleDeparture(socket).catch(() => undefined);
@@ -253,32 +322,65 @@ export class GameGateway implements OnGatewayInit, OnGatewayDisconnect {
     if (!seat) return;
     (socket.data as SocketData).lobby = undefined;
     const { code, playerId } = seat;
+    try {
+      await socket.leave(code);
+    } catch {
+      /* getrennter Socket: leave ist No-Op */
+    }
 
-    let forfeitWinner: PlayerId | null = null;
+    const pre = await this.repo.get(code);
+    const inProgress = pre?.status === 'in_progress' && Boolean(pre.game);
+    const ttl = inProgress ? this.lobby.ttlFor('in_progress') : this.lobby.ttlFor('waiting');
+
+    let paused = false;
     const result = await this.repo.update(
       code,
       (rec) => {
         if (rec.status === 'in_progress' && rec.game) {
-          forfeitWinner = opponentOf(playerId);
-          return { ...rec, status: 'finished', game: { ...rec.game, status: 'finished', winner: forfeitWinner } };
+          paused = true;
+          // FR-004/005/011: Sitz reservieren (60-s-Fenster) + Zug-Timer pausieren statt Forfeit.
+          return markDisconnected(rec, playerId, this.now(), this.config.reconnectWindowMs);
         }
-        return removeBeforeStart(rec, playerId); // null = Host weg → schließen
+        return removeBeforeStart(rec, playerId); // null = Host weg → schließen (FR-018, unverändert)
       },
-      this.lobby.ttlFor('waiting'),
+      ttl,
     );
 
-    if (forfeitWinner) {
+    if (paused && result.status === 'ok') {
       this.timer.clear(code);
-      this.server.to(code).emit(ServerEvents.gameOver, { code, winner: forfeitWinner, reason: 'forfeit' });
-      if (result.status === 'ok') await this.finishAndPersist(result.record, forfeitWinner, 'FORFEITED');
+      const deadline = result.record.seats.find((s) => s.playerId === playerId)?.reconnectDeadline ?? this.now();
+      this.grace.schedule(code, playerId, deadline, () => void this.onGraceExpired(code, playerId));
+      this.server.to(code).emit(ServerEvents.opponentDisconnected, { code, playerId, graceDeadline: deadline });
+      this.broadcastLobbyState(result.record);
       return;
     }
     if (result.status === 'closed') {
       this.timer.clear(code);
+      this.grace.clearAll(code);
       this.server.to(code).emit(ServerEvents.error, { error: 'lobby-not-found', message: 'Lobby geschlossen' });
       return;
     }
     if (result.status === 'ok') this.broadcastLobbyState(result.record);
+  }
+
+  // ── 005: Ablauf des Reconnect-Fensters → Aufgabe-Wertung (FR-014/014a/016) ────
+  private async onGraceExpired(code: string, playerId: PlayerId): Promise<void> {
+    let winner: PlayerId | null = null;
+    const result = await this.repo.update(
+      code,
+      (rec) => {
+        const res = resolveAbandon(rec, playerId);
+        if (!res) return rec; // Status-Guard: schon beendet/wieder verbunden → No-Op (FR-016)
+        winner = res.winner;
+        return res.record;
+      },
+      this.lobby.ttlFor('in_progress'),
+    );
+    if (!winner || result.status !== 'ok') return;
+    this.grace.clearAll(code);
+    this.timer.clear(code);
+    this.server.to(code).emit(ServerEvents.gameOver, { code, winner, reason: 'forfeit' });
+    await this.finishAndPersist(result.record, winner, 'FORFEITED');
   }
 
   // ── US6: Persistenz bei Partieende (FR-024–026) ──────────────────────────────
@@ -286,6 +388,14 @@ export class GameGateway implements OnGatewayInit, OnGatewayDisconnect {
     try {
       await this.matches.persistFinished(record, winner, status, this.now());
     } finally {
+      // Terminal-Marker für verspäteten Reconnect (FR-017) VOR dem Löschen ablegen.
+      await this.repo
+        .setMatchResult(record.code, {
+          winner,
+          reason: status === 'FORFEITED' ? 'forfeit' : 'all-sunk',
+          endedAt: this.now(),
+        })
+        .catch(() => undefined);
       const host = record.seats.find((s) => s.playerId === 'A');
       if (host?.identity.kind === 'user') await this.repo.removeOpenLobby(host.identity.userId, record.code);
       await this.repo.delete(record.code);
