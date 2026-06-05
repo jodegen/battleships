@@ -1,0 +1,27 @@
+{
+  "name": "@schiffe/engine",
+  "version": "0.1.0",
+  "description": "Framework-unabhängige, deterministische Spiel-Engine & KI für Schiffe versenken (Single Source of Truth).",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "coverage": "vitest run --coverage",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "eslint .",
+    "build": "tsc -p tsconfig.build.json"
+  },
+  "license": "MIT"
+}
