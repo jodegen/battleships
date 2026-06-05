@@ -32,15 +32,14 @@ cp packages/server/.env.example packages/server/.env
 #   WEB_ORIGIN=http://localhost:3000
 ```
 
-## 4. Datenbankschema provisionieren & Client generieren
+## 4. Datenbankschema migrieren & Client generieren
 
 ```bash
-# Noch keine committeten Migrationen → Schema direkt pushen:
-npm run --workspace packages/server prisma:push       # prisma db push (legt Tabellen an)
+npm run --workspace packages/server prisma:deploy     # committete Migrationen anwenden
 npm run --workspace packages/server prisma:generate   # Prisma Client
 
-# Sobald eine Dev-DB steht, kann die erste Migration erzeugt werden:
-#   npm run --workspace packages/server prisma:migrate -- --name init
+# Schemaänderungen während der Entwicklung erzeugen eine neue Migration:
+#   npm run --workspace packages/server prisma:migrate -- --name <beschreibung>
 ```
 
 ## 5. Server & Web starten
