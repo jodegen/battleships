@@ -119,12 +119,13 @@ export function canStart(s: SessionState): boolean {
   return s.phase === 'placing' && validatePlacement(s.config, s.draft.ships).ok;
 }
 
-export function startGame(s: SessionState, rng: Rng): SessionState {
+export function startGame(s: SessionState, rng: Rng, resultId?: string): SessionState {
   if (!canStart(s)) return s;
   const ai = generateFleet(s.config, rng); // gegnerische Flotte automatisch platzieren
   if (!ai.ok) return s;
   const game = createGame(s.config, { A: s.draft.ships, B: ai.ships });
-  return { ...s, game, phase: 'playing', turn: currentTurn(game) };
+  // resultId wird einmal pro Partie gesetzt und bleibt bis zum Neustart stabil (FR-019).
+  return { ...s, game, phase: 'playing', turn: currentTurn(game), resultId };
 }
 
 // ---------- Spielablauf (US2) ----------

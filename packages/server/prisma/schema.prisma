@@ -1,0 +1,62 @@
+// Datenmodell Meilenstein 2 — Identität & Persistenz (data-model.md).
+// Gäste haben KEIN Modell (stateless Token). winRate/gamesPlayed werden abgeleitet,
+// nicht gespeichert (FR-018). MatchResult ist ein Dedup-Ledger (FR-019), keine Match-History.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Outcome {
+  WIN
+  LOSS
+}
+
+model User {
+  id           String        @id @default(cuid())
+  email        String        @unique
+  displayName  String
+  passwordHash String
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  stat         Stat?
+  sessions     Session[]
+  matchResults MatchResult[]
+}
+
+model Session {
+  id         String    @id // = hash(rawToken); Rohwert lebt nur im Cookie
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime  @default(now())
+  expiresAt  DateTime
+  lastUsedAt DateTime?
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model Stat {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wins      Int      @default(0)
+  losses    Int      @default(0)
+  updatedAt DateTime @updatedAt
+}
+
+model MatchResult {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  resultId   String
+  outcome    Outcome
+  recordedAt DateTime @default(now())
+
+  @@unique([userId, resultId])
+  @@index([userId])
+}

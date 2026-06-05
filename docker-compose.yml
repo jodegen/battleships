@@ -1,0 +1,25 @@
+# Lokale Entwicklungs-Datenbank für packages/server (Meilenstein 2).
+# Start: `docker compose up -d`  ·  Stop: `docker compose down`  ·  Reset: `docker compose down -v`
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: schiffe-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: schiffe
+      POSTGRES_PASSWORD: schiffe
+      POSTGRES_DB: schiffe
+    # Host-Port 5433, um Konflikte mit einer lokal installierten Postgres (z. B. Postgres.app
+    # auf 5432) zu vermeiden. Im Container lauscht Postgres weiterhin auf 5432.
+    ports:
+      - '5433:5432'
+    volumes:
+      - schiffe_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U schiffe -d schiffe']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  schiffe_pgdata:
