@@ -18,8 +18,8 @@ docker compose up -d
 # 2) Env
 cp packages/server/.env.example packages/server/.env   # Werte setzen
 
-# 3) Schema in die DB schreiben + Prisma-Client erzeugen
-npm run -w @schiffe/server prisma:push
+# 3) Migrationen anwenden + Prisma-Client erzeugen
+npm run -w @schiffe/server prisma:deploy
 npm run -w @schiffe/server prisma:generate
 
 # 4) Server (Port 3001) und Frontend (Port 3000, proxyt /api/* → :3001)
@@ -27,10 +27,11 @@ npm run -w @schiffe/server dev
 npm run -w @schiffe/web dev
 ```
 
-> Hinweis: Es gibt noch **keine** committeten Prisma-Migrationen. Das Schema wird via
-> `prisma db push` provisioniert. Sobald eine Entwicklungs-DB verfügbar ist, sollte mit
-> `npm run -w @schiffe/server prisma:migrate -- --name init` die erste Migration erzeugt und
-> committet werden; CI/Quickstart können dann auf `prisma:deploy` umstellen.
+> Migrationen sind committet (`prisma/migrations/`, beginnend mit `…_init`). `prisma:deploy`
+> wendet sie an (CI + lokal). Schemaänderungen während der Entwicklung erzeugen eine neue
+> Migration via `npm run -w @schiffe/server prisma:migrate -- --name <beschreibung>`.
+> (`prisma:push` bleibt für schnelle, wegwerfbare Experimente erhalten, ist aber nicht der
+> reguläre Weg.)
 
 ## Umgebungsvariablen
 

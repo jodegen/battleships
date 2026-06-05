@@ -126,9 +126,9 @@ jobs:
       - name: Prisma generate
         run: npm run --workspace packages/server prisma:generate
 
-      # Schema in die Test-DB schreiben (noch keine committeten Migrationen — db push).
-      - name: Provision database schema
-        run: npm run --workspace packages/server prisma:push
+      # Committete Migrationen auf die Test-DB anwenden.
+      - name: Apply database migrations
+        run: npm run --workspace packages/server prisma:deploy
 
       - name: Lint
         run: npm run --workspace packages/server lint
