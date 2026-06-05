@@ -1,0 +1,60 @@
+/* Bewusst minimal/ungestylt (FR-019) — nur zur Lesbarkeit der Zustände. */
+* {
+  box-sizing: border-box;
+}
+body {
+  font-family: system-ui, sans-serif;
+  margin: 1rem;
+}
+.row {
+  display: flex;
+  gap: 0.5rem;
+  margin: 0.5rem 0;
+  flex-wrap: wrap;
+}
+.boards {
+  display: flex;
+  gap: 2rem;
+  flex-wrap: wrap;
+}
+.board {
+  display: grid;
+  gap: 1px;
+  background: #999;
+  width: fit-content;
+  border: 1px solid #999;
+  touch-action: none;
+}
+.cell {
+  width: 1.6rem;
+  height: 1.6rem;
+  padding: 0;
+  border: none;
+  background: #cfe8ff; /* water */
+}
+.cell.unknown {
+  background: #cfe8ff;
+}
+.cell.ship {
+  background: #555;
+}
+.cell.preview {
+  background: #9ad29a;
+}
+.cell.hit {
+  background: #e08a3c;
+}
+.cell.sunk {
+  background: #b03030;
+}
+.cell.miss {
+  background: #eef;
+  opacity: 0.6;
+}
+.status {
+  margin: 0.5rem 0;
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  min-height: 2rem;
+}

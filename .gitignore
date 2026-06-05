@@ -4,7 +4,10 @@ node_modules/
 # Build output
 dist/
 build/
+.next/
+out/
 *.tsbuildinfo
+next-env.d.ts
 
 # Test / coverage
 coverage/
