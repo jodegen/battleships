@@ -87,3 +87,22 @@ KI-Partien laufen in M1/002 **offline im Client**; ihr Ergebnis wird gemeldet, n
 errechnet. Diese eng begrenzte, dokumentierte Abweichung ist im
 [Plan](../../specs/003-identity-persistence/plan.md#complexity-tracking) begründet (Idempotenz als
 Schutz gegen Doppelzählung) und wird mit M3 (server-autoritatives PvP) aufgelöst.
+
+## M3 (004) — PvP-Lobbys & Echtzeit-Online-Partie
+
+Server ist jetzt **autoritative Spiel-Laufzeit**: ein Socket.IO-`GameGateway` (ein Raum pro Lobby),
+**Redis** für den aktiven Lobby-/Spielzustand + Presence + Pub/Sub-Backplane
+(`@socket.io/redis-adapter`, mehr-instanz-fähig). Die bestehende **Engine** ist die einzige
+Spiellogik (`createGame`/`applyShot`/`viewFor`). **Fog of War** strukturell über `viewFor` —
+ungetroffene Gegnerschiffe verlassen den Server nie. Serverseitiger **Zug-Timer** (Deadline im
+Redis-State), idempotente Züge (`moveId`), beendete Partien → `Match`/`MatchMove` (Spec §9) +
+idempotente Stats-Fortschreibung. **Löst die M2-Prinzip-I-Abweichung auf.**
+
+- `src/realtime/` — `game.gateway.ts`, `events.ts` (Contract), `ws-auth.middleware.ts`,
+  `ws-identity.ts` (rein), `redis-io.adapter.ts`.
+- `src/lobby/` — `lobby-state.ts`/`lobby-code.ts` (rein, TDD), `lobby.service.ts`, `lobby.repository.ts`.
+- `src/game/` — `game.service.ts` (Engine-Brücke), `fog-of-war.ts`/`move-dedup.ts` (rein), `turn-timer.service.ts`.
+- `src/persistence/` — `pvp-result.ts` (rein), `match.service.ts`.
+
+Lokal: `docker compose up -d` (Postgres + Redis), `.env` mit `REDIS_URL`. Online-Flow & Smoke:
+siehe [quickstart](../../specs/004-pvp-realtime-lobbies/quickstart.md).

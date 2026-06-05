@@ -16,6 +16,21 @@ enum Outcome {
   LOSS
 }
 
+enum MatchMode {
+  PVP
+}
+
+enum MatchStatus {
+  FINISHED
+  FORFEITED
+}
+
+enum MoveResult {
+  MISS
+  HIT
+  SUNK
+}
+
 model User {
   id           String        @id @default(cuid())
   email        String        @unique
@@ -26,6 +41,8 @@ model User {
   stat         Stat?
   sessions     Session[]
   matchResults MatchResult[]
+  matchesAsA   Match[]       @relation("MatchPlayerA")
+  matchesAsB   Match[]       @relation("MatchPlayerB")
 }
 
 model Session {
@@ -59,4 +76,42 @@ model MatchResult {
 
   @@unique([userId, resultId])
   @@index([userId])
+}
+
+// M3 (004): dauerhafte PvP-Partie + Zug-Ledger (Spec §9). Idempotent über matchKey.
+// Gäste haben keinen User-Eintrag → playerXId nullable, Anzeigename separat persistiert.
+model Match {
+  id             String      @id @default(cuid())
+  matchKey       String      @unique
+  lobbyCode      String
+  mode           MatchMode   @default(PVP)
+  status         MatchStatus
+  playerAId      String?
+  playerA        User?       @relation("MatchPlayerA", fields: [playerAId], references: [id])
+  playerADisplay String
+  playerBId      String?
+  playerB        User?       @relation("MatchPlayerB", fields: [playerBId], references: [id])
+  playerBDisplay String
+  winnerSeat     String
+  settings       Json
+  startedAt      DateTime
+  endedAt        DateTime    @default(now())
+  moves          MatchMove[]
+
+  @@index([playerAId])
+  @@index([playerBId])
+}
+
+model MatchMove {
+  id        String     @id @default(cuid())
+  matchId   String
+  match     Match      @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  turnIndex Int
+  byPlayer  String
+  x         Int
+  y         Int
+  result    MoveResult
+
+  @@unique([matchId, turnIndex])
+  @@index([matchId])
 }

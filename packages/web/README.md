@@ -33,3 +33,11 @@ und `contracts/session-controller.md` für die UI↔Engine-Naht.
 - `src/auth/useIdentity.ts` — React-Hook: Session-Restore (`GET /me`), Registrierung/Login/Gast/Logout.
 - `src/components/` — dünne Präsentationskomponenten (Platzierung, Boards, Status, `AuthPanel`, `ProfilePanel`).
 - `app/` — Next.js App Router; `next.config.mjs` proxyt im Dev `/api/*` → Server (Same-Origin-Cookies).
+
+## Online-Modus (M3/004)
+
+- `src/realtime/socket-client.ts` — typisierter socket.io-Client (same-origin, Cookies).
+- `src/realtime/useOnlineGame.ts` — Hook: Verbindung + abgeleiteter Anzeige-Zustand aus Server-Events (nur Anzeige, Server ist autoritativ).
+- `src/components/online/` — `LobbyPanel`, `OnlineBoards`, `TurnTimer`, `OpponentStatus`.
+- `app/online/page.tsx` — Online-Flow: Lobby → Platzierung → Echtzeit-Brett (bewusst schlicht).
+- `next.config.mjs` proxyt zusätzlich `/socket.io/*` → Server (Same-Origin-Cookies für WS); alternativ `NEXT_PUBLIC_WS_URL` setzen.

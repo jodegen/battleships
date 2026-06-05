@@ -14,6 +14,11 @@ function service(overrides: Partial<AppConfig> = {}): GuestTokenService {
     cookieSecure: false,
     sessionTtlMs: 30 * DAY,
     guestTtlMs: DAY,
+    redisUrl: 'redis://localhost:6380',
+    turnTimerDefaultSeconds: 30,
+    maxOpenLobbiesPerUser: 5,
+    joinRateLimitWindowSeconds: 60,
+    joinRateLimitMaxFails: 10,
     ...overrides,
   } satisfies AppConfig;
   return new GuestTokenService(config);

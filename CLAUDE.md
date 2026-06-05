@@ -1,18 +1,24 @@
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan:
-`specs/003-identity-persistence/plan.md`
+`specs/004-pvp-realtime-lobbies/plan.md`
 
-Active feature: **Identität und Persistenz (003, Meilenstein 2)** — neues Workspace-Paket
-`packages/server` (NestJS + TS) mit PostgreSQL via Prisma (`User`, `Session`, `Stat`,
-`MatchResult`-Dedup-Ledger). E-Mail/Passwort-Auth (argon2id) mit HTTP-only-DB-Session-Cookie
-(rollierend ~30 Tage); Gäste als stateless signiertes Token ohne DB-Eintrag. REST:
-register/login/logout/guest, `GET /me`, `/me/profile`, `/me/stats`, `POST /me/match-results`
-(idempotent über `resultId`). `packages/web` konsumiert die API (`credentials:'include'`,
-Dev-Rewrite-Proxy). Reine Domänenlogik (Passwort, winRate, Identität) testgetrieben mit Vitest;
-Endpunkte per supertest + Test-Postgres. Lokale DB via Docker Compose. Engine bleibt SSoT und
-unverändert; der Server trifft keine Spielregelentscheidung (winRate ist Statistik).
+Active feature: **PvP-Lobbys & Echtzeit-Online-Partie (004, Meilenstein 3)** — erweitert
+`packages/server` (NestJS) um einen **Socket.IO**-WebSocket-Layer (ein Raum pro Lobby) und
+**Redis** (aktiver Lobby-/Spielzustand, Presence, Pub/Sub via `@socket.io/redis-adapter` →
+mehr-instanz-fähig; Lastziel bleibt Einzelinstanz). Die bestehende **Engine** (`@schiffe/engine`)
+ist die **einzige** Spiellogik: `createGame`/`applyShot`/`resolveShot`/`viewFor` laufen
+serverseitig (server-autoritativ). **Fog of War** strukturell über `viewFor` — ungetroffene
+gegnerische Schiffe verlassen den Server nie. Lobby-Lebenszyklus
+`waiting→placing→in_progress→finished` mit Einstellungen (Berührung, Zug-Timer 15/30/60/aus,
+Extrazug). Serverseitiger **Zug-Timer** (Deadline im Redis-State). Idempotente Züge über `moveId`.
+Beendete Partien → neue Prisma-Modelle **`Match`/`MatchMove`** (Spec §9) + idempotente
+**Stats**-Fortschreibung eingeloggter Spieler (Gäste: keine Statistik). `packages/web` erhält
+schlichte Online-Screens (Lobby, Platzierung, Online-Brett, Countdown). TDD für reine Serverlogik
+(Zustandsmaschine, Fog of War, Timer, Idempotenz) + `socket.io-client`-Integration; Redis lokal
+via Docker Compose. **Löst die in M2 dokumentierte Prinzip-I-Abweichung auf.**
 
-Vorherige Features: **Minimal spielbares Frontend gegen die KI (002)** — `packages/web`, fertig.
+Vorherige Features: **Identität & Persistenz (003, M2)** — `packages/server`, fertig.
+**Minimal spielbares Frontend gegen die KI (002)** — `packages/web`, fertig.
 **Spiel-Engine & KI (Meilenstein 1, 001)** — `packages/engine`, fertig.
 <!-- SPECKIT END -->
