@@ -3,9 +3,14 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
-// FR-018 / SC-006: Der Spielablauf ist vollständig clientseitig — kein Netzwerkzugriff.
+// Der SPIELABLAUF bleibt vollständig clientseitig (002, FR-001/018): kein Netzwerkzugriff im
+// Spielcode. Ausnahme ab Feature 003 (Identität & Persistenz): der Netzwerkzugriff ist auf die
+// einzige, explizite API-Grenze `src/api/` beschränkt (Auth/Stats). Alles andere bleibt offline.
 const here = dirname(fileURLToPath(import.meta.url));
 const roots = [join(here, '../../src'), join(here, '../../app')];
+
+// Bewusste Netzwerk-Grenze (Feature 003): hier ist `fetch` erlaubt.
+const ALLOWED = [join('src', 'api')];
 
 function walk(dir: string): string[] {
   const out: string[] = [];
@@ -23,6 +28,7 @@ describe('Offline-Guard (FR-018)', () => {
     const stripComments = (c: string) => c.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
     const offenders = roots
       .flatMap(walk)
+      .filter((f) => !ALLOWED.some((allowed) => f.includes(allowed)))
       .filter((f) => pattern.test(stripComments(readFileSync(f, 'utf8'))));
     expect(offenders).toEqual([]);
   });

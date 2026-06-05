@@ -27,6 +27,8 @@ export interface SessionState {
   turn: PlayerId | null;
   lastShot?: { by: PlayerId; result: ShotResult };
   outcome?: 'won' | 'lost';
+  /** Partie-stabile Kennung für die idempotente Ergebnis-Meldung an den Server (FR-019). */
+  resultId?: string;
 }
 
 /** Der menschliche Spieler ist Seite A, die KI ist Seite B. */

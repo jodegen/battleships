@@ -84,3 +84,60 @@ jobs:
 
       - name: Test
         run: npm run --workspace packages/web test
+
+  server:
+    name: server (lint · typecheck · test · build)
+    runs-on: ubuntu-latest
+
+    # Echte Postgres für die Integrationstests (Auth-Flow, Stats-Schreibpfad, Idempotenz).
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: schiffe
+          POSTGRES_PASSWORD: schiffe
+          POSTGRES_DB: schiffe
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U schiffe -d schiffe"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://schiffe:schiffe@localhost:5432/schiffe?schema=public
+      COOKIE_SECRET: ci-cookie-secret
+      GUEST_TOKEN_SECRET: ci-guest-secret
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prisma generate
+        run: npm run --workspace packages/server prisma:generate
+
+      # Schema in die Test-DB schreiben (noch keine committeten Migrationen — db push).
+      - name: Provision database schema
+        run: npm run --workspace packages/server prisma:push
+
+      - name: Lint
+        run: npm run --workspace packages/server lint
+
+      - name: Typecheck
+        run: npm run --workspace packages/server typecheck
+
+      - name: Test
+        run: npm run --workspace packages/server test
+
+      - name: Build
+        run: npm run --workspace packages/server build

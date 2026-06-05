@@ -1,9 +1,14 @@
 # @schiffe/web
 
-Bewusst schlichtes, vollständig clientseitiges Next.js/React-Frontend, um „Schiffe versenken"
-gegen die KI zu spielen (Meilenstein 2). Die gesamte Spiellogik stammt aus `@schiffe/engine`
-(Single Source of Truth) — das Frontend bildet keine Regeln nach und legt verdeckte
-Gegnerpositionen nie offen.
+Schlichtes Next.js/React-Frontend, um „Schiffe versenken" gegen die KI zu spielen. Die gesamte
+**Spiellogik läuft clientseitig** aus `@schiffe/engine` (Single Source of Truth) — das Frontend
+bildet keine Regeln nach und legt verdeckte Gegnerpositionen nie offen.
+
+Ab Feature 003 (Identität & Persistenz) spricht das Frontend zusätzlich mit der API
+(`@schiffe/server`): Registrierung/Login/Gast, Profil und das Melden beendeter KI-Ergebnisse für
+die Statistik. Der **Netzwerkzugriff ist auf `src/api/` beschränkt** (durch einen Test erzwungen);
+das Spiel selbst bleibt offline. Ohne laufenden Server kann weiterhin anonym gegen die KI gespielt
+werden — nur Auth/Statistik stehen dann nicht zur Verfügung.
 
 ## Befehle
 
@@ -23,6 +28,8 @@ und `contracts/session-controller.md` für die UI↔Engine-Naht.
 ## Aufbau
 
 - `src/session/` — framework-unabhängiger Session-Controller (reine Funktionen, nur Engine-Aufrufe), mit Vitest getestet.
-- `src/hooks/useGameSession.ts` — React-Hook: Zustand + zeitgesteuertes Abspielen der KI-Schüsse (Pacing).
-- `src/components/` — dünne Präsentationskomponenten (Platzierung, Boards, Status).
-- `app/` — Next.js App Router (rein clientseitig).
+- `src/hooks/useGameSession.ts` — React-Hook: Zustand + zeitgesteuertes Abspielen der KI-Schüsse (Pacing); meldet das Ergebnis bei Spielende (FR-019/020).
+- `src/api/client.ts` — einzige Netzwerk-Grenze: typisierter Fetch-Client (`credentials: 'include'`) gegen die `@schiffe/server`-API.
+- `src/auth/useIdentity.ts` — React-Hook: Session-Restore (`GET /me`), Registrierung/Login/Gast/Logout.
+- `src/components/` — dünne Präsentationskomponenten (Platzierung, Boards, Status, `AuthPanel`, `ProfilePanel`).
+- `app/` — Next.js App Router; `next.config.mjs` proxyt im Dev `/api/*` → Server (Same-Origin-Cookies).

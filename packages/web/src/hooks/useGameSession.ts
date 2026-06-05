@@ -8,6 +8,24 @@ import type { Difficulty, SessionState } from '@/session/types';
 /** Verzögerung zwischen aufeinanderfolgenden KI-Schüssen (FR-020), damit Serien sichtbar sind. */
 export const AI_DELAY_MS = 400;
 
+export interface GameEndResult {
+  resultId: string;
+  outcome: 'won' | 'lost';
+}
+
+export interface GameSessionOptions {
+  /** Wird genau einmal pro beendeter Partie aufgerufen (Ergebnis-Meldung, FR-019/020). */
+  onGameEnd?: (result: GameEndResult) => void;
+  /** Erzeugt die partie-stabile resultId; injizierbar für deterministische Tests. */
+  makeResultId?: () => string;
+}
+
+function defaultResultId(): string {
+  const cryptoObj = (globalThis as { crypto?: { randomUUID?: () => string } }).crypto;
+  if (cryptoObj?.randomUUID) return cryptoObj.randomUUID();
+  return `r-${String(Date.now())}-${String(Math.floor(Math.random() * 1e9))}`;
+}
+
 export interface GameSession {
   state: SessionState;
   chooseDifficulty: (d: Difficulty) => void;
@@ -22,10 +40,16 @@ export interface GameSession {
   restart: () => void;
 }
 
-export function useGameSession(initialSeed: number, delayMs: number = AI_DELAY_MS): GameSession {
+export function useGameSession(
+  initialSeed: number,
+  delayMs: number = AI_DELAY_MS,
+  options: GameSessionOptions = {},
+): GameSession {
+  const { onGameEnd, makeResultId = defaultResultId } = options;
   const [state, setState] = useState<SessionState>(() => ctrl.createSession(initialSeed));
   const rngRef = useRef<Rng>(createRng(initialSeed));
   const seedRef = useRef<number>(initialSeed);
+  const reportedRef = useRef<boolean>(false);
 
   // KI-Züge zeitgesteuert abspielen: bei jedem Zustandswechsel prüfen, ob die KI dran ist.
   useEffect(() => {
@@ -35,6 +59,14 @@ export function useGameSession(initialSeed: number, delayMs: number = AI_DELAY_M
     }, delayMs);
     return () => clearTimeout(timer);
   }, [state, delayMs]);
+
+  // Ergebnis-Meldung: genau einmal pro beendeter Partie (FR-019/020).
+  useEffect(() => {
+    if (state.phase === 'finished' && state.outcome && state.resultId && !reportedRef.current) {
+      reportedRef.current = true;
+      onGameEnd?.({ resultId: state.resultId, outcome: state.outcome });
+    }
+  }, [state, onGameEnd]);
 
   const chooseDifficulty = useCallback((d: Difficulty) => {
     setState((s) => ctrl.chooseDifficulty(s, d));
@@ -60,8 +92,9 @@ export function useGameSession(initialSeed: number, delayMs: number = AI_DELAY_M
   const canStart = useCallback(() => ctrl.canStart(state), [state]);
 
   const startGame = useCallback(() => {
-    setState((s) => ctrl.startGame(s, rngRef.current));
-  }, []);
+    const resultId = makeResultId();
+    setState((s) => ctrl.startGame(s, rngRef.current, resultId));
+  }, [makeResultId]);
 
   const shoot = useCallback((target: Coord) => {
     setState((s) => ctrl.playerShoot(s, target).next);
@@ -71,6 +104,7 @@ export function useGameSession(initialSeed: number, delayMs: number = AI_DELAY_M
     const nextSeed = (seedRef.current + 0x9e3779b1) >>> 0;
     seedRef.current = nextSeed;
     rngRef.current = createRng(nextSeed);
+    reportedRef.current = false;
     setState(ctrl.restart(nextSeed));
   }, []);
 

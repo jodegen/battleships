@@ -6,11 +6,11 @@
     "packages/*"
   ],
   "scripts": {
-    "test": "npm --workspace packages/engine run test",
+    "test": "npm --workspace packages/engine run test && npm --workspace packages/web run test && npm --workspace packages/server run test",
     "test:watch": "npm --workspace packages/engine run test:watch",
-    "lint": "npm --workspace packages/engine run lint",
-    "typecheck": "npm --workspace packages/engine run typecheck",
-    "build": "npm --workspace packages/engine run build"
+    "lint": "npm --workspace packages/engine run lint && npm --workspace packages/web run lint && npm --workspace packages/server run lint",
+    "typecheck": "npm --workspace packages/engine run typecheck && npm --workspace packages/web run typecheck && npm --workspace packages/server run typecheck",
+    "build": "npm --workspace packages/engine run build && npm --workspace packages/web run build && npm --workspace packages/server run build"
   },
   "devDependencies": {
     "@types/node": "^22.8.6",
