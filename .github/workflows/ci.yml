@@ -89,7 +89,8 @@ jobs:
     name: server (lint · typecheck · test · build)
     runs-on: ubuntu-latest
 
-    # Echte Postgres für die Integrationstests (Auth-Flow, Stats-Schreibpfad, Idempotenz).
+    # Echte Postgres + Redis für die Integrationstests (Auth-Flow, Stats-Schreibpfad,
+    # Idempotenz, Realtime-Gateway, Fog of War, Timer).
     services:
       postgres:
         image: postgres:16-alpine
@@ -104,9 +105,19 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
 
     env:
       DATABASE_URL: postgresql://schiffe:schiffe@localhost:5432/schiffe?schema=public
+      REDIS_URL: redis://localhost:6379
       COOKIE_SECRET: ci-cookie-secret
       GUEST_TOKEN_SECRET: ci-guest-secret
 

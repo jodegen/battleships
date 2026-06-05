@@ -1,4 +1,5 @@
-# Lokale Entwicklungs-Datenbank für packages/server (Meilenstein 2).
+# Lokale Entwicklungs-Infrastruktur für packages/server.
+#   M2 (003): Postgres (Identität/Persistenz).  M3 (004): Redis (Live-State/Pub-Sub).
 # Start: `docker compose up -d`  ·  Stop: `docker compose down`  ·  Reset: `docker compose down -v`
 services:
   postgres:
@@ -21,5 +22,22 @@ services:
       timeout: 5s
       retries: 10
 
+  redis:
+    image: redis:7-alpine
+    container_name: schiffe-redis
+    restart: unless-stopped
+    # Host-Port 6380, um Konflikte mit einem lokal installierten Redis (Standard 6379) zu
+    # vermeiden. Im Container lauscht Redis weiterhin auf 6379.
+    ports:
+      - '6380:6379'
+    volumes:
+      - schiffe_redisdata:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
 volumes:
   schiffe_pgdata:
+  schiffe_redisdata:
