@@ -30,7 +30,9 @@ export async function createWsApp(): Promise<WsContext> {
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
   const app = moduleRef.createNestApplication();
   app.use(cookieParser(process.env.COOKIE_SECRET));
-  app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
+  app.useGlobalPipes(
+    new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
+  );
 
   const redis = app.get(RedisService);
   // Tests laufen single-instance → Standard-Socket.IO-Adapter genügt. Der Redis-Pub/Sub-
@@ -160,3 +162,37 @@ export async function startGame(
 }
 
 export const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+
+export interface QueueMatchedPayload {
+  readonly code: string;
+  readonly you: 'A' | 'B';
+  readonly reconnectToken: string;
+}
+
+export interface QuickMatch {
+  readonly a: Socket;
+  readonly b: Socket;
+  readonly code: string;
+  readonly am: QueueMatchedPayload;
+  readonly bm: QueueMatchedPayload;
+}
+
+/**
+ * Bringt zwei eingeloggte Spieler über Quick Play (`queue:join`) zur Paarung. Der zuerst Wartende
+ * (A) wird Host. Liefert beide Sockets, den Lobby-Code und die `queue:matched`-Payloads (006).
+ */
+export async function quickMatch(
+  ctx: WsContext,
+  emails: { host: string; guest: string } = { host: 'qa@x.com', guest: 'qb@x.com' },
+): Promise<QuickMatch> {
+  const a = await connect(ctx.port, await registerCookie(ctx.app, emails.host, 'Alice'));
+  const aMatched = waitFor<QueueMatchedPayload>(a, 'queue:matched');
+  await a.emitWithAck('queue:join', {});
+
+  const b = await connect(ctx.port, await registerCookie(ctx.app, emails.guest, 'Bob'));
+  const bMatched = waitFor<QueueMatchedPayload>(b, 'queue:matched');
+  await b.emitWithAck('queue:join', {});
+
+  const [am, bm] = await Promise.all([aMatched, bMatched]);
+  return { a, b, code: am.code, am, bm };
+}

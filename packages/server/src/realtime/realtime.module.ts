@@ -3,11 +3,12 @@ import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { GameModule } from '../game/game.module';
 import { LobbyModule } from '../lobby/lobby.module';
+import { MatchmakingModule } from '../matchmaking/matchmaking.module';
 import { PersistenceModule } from '../persistence/persistence.module';
 import { GameGateway } from './game.gateway';
 
 @Module({
-  imports: [AuthModule, LobbyModule, GameModule, PersistenceModule],
+  imports: [AuthModule, LobbyModule, GameModule, MatchmakingModule, PersistenceModule],
   providers: [GameGateway],
 })
 export class RealtimeModule {}

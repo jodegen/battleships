@@ -9,6 +9,7 @@ const lobbyKey = (code: string): string => `lobby:${code}`;
 const openKey = (userId: string): string => `open-lobbies:${userId}`;
 const joinFailKey = (idKey: string): string => `join-fails:${idKey}`;
 const matchResultKey = (code: string): string => `match-result:${code}`;
+const userGameKey = (userId: string): string => `game-of-user:${userId}`;
 
 /** Flüchtiger Terminal-Marker (005, FR-017): verspäteter Reconnect erfährt das Endergebnis. */
 export interface TerminalResult {
@@ -94,7 +95,12 @@ export class LobbyRepository {
   // ── Reconnect: Terminal-Marker für verspäteten Wiedereintritt (005, FR-017) ──
 
   async setMatchResult(code: string, result: TerminalResult): Promise<void> {
-    await this.redis.client.set(matchResultKey(code), JSON.stringify(result), 'PX', MATCH_RESULT_TTL_MS);
+    await this.redis.client.set(
+      matchResultKey(code),
+      JSON.stringify(result),
+      'PX',
+      MATCH_RESULT_TTL_MS,
+    );
   }
   async getMatchResult(code: string): Promise<TerminalResult | null> {
     const raw = await this.redis.client.get(matchResultKey(code));
@@ -125,5 +131,19 @@ export class LobbyRepository {
   async joinFailureCount(idKey: string): Promise<number> {
     const raw = await this.redis.client.get(joinFailKey(idKey));
     return raw ? Number.parseInt(raw, 10) : 0;
+  }
+
+  // ── 006: Konto-weiter Aktiv-Index (FR-015) — ein eingeloggter Nutzer kann nicht ──
+  // gleichzeitig in einer Partie/offenen Lobby UND in der Quick-Play-Warteschlange sein.
+
+  /** Merkt sich, in welcher Lobby/Partie ein eingeloggter Nutzer sitzt (Host oder Beitretender). */
+  async setUserGame(userId: string, code: string, ttlMs: number): Promise<void> {
+    await this.redis.client.set(userGameKey(userId), code, 'PX', ttlMs);
+  }
+  async getUserGame(userId: string): Promise<string | null> {
+    return this.redis.client.get(userGameKey(userId));
+  }
+  async clearUserGame(userId: string): Promise<void> {
+    await this.redis.client.del(userGameKey(userId));
   }
 }

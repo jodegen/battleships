@@ -39,9 +39,12 @@ export type ErrorCode =
   | 'not-in-progress'
   | 'invalid-name'
   | 'game-finished'
+  | 'already-in-game'
   | 'internal-error';
 
-export type Ack<T> = ({ readonly ok: true } & T) | { readonly ok: false; readonly error: ErrorCode };
+export type Ack<T> =
+  | ({ readonly ok: true } & T)
+  | { readonly ok: false; readonly error: ErrorCode };
 
 // ── Server→Client Sichten ────────────────────────────────────────────────────
 
@@ -67,7 +70,10 @@ export interface LobbyView {
 export interface GameViewMsg {
   readonly code: string;
   readonly you: PlayerId;
-  readonly own: { readonly ships: ReadonlyArray<ShipPlacement>; readonly shotsReceived: ReadonlyArray<Coord> };
+  readonly own: {
+    readonly ships: ReadonlyArray<ShipPlacement>;
+    readonly shotsReceived: ReadonlyArray<Coord>;
+  };
   readonly opponentShots: ReadonlyArray<OpponentShotView>;
   readonly turn: PlayerId;
   readonly turnDeadline: number | null;
@@ -109,6 +115,19 @@ export interface OpponentReconnectedMsg {
   readonly playerId: PlayerId;
 }
 
+/** Quick-Play-Paarung gefunden (006, FR-003/006/007). Push an BEIDE gepaarten Spieler. */
+export interface QueueMatchedMsg {
+  readonly code: string;
+  readonly you: PlayerId;
+  readonly lobby: LobbyView;
+  readonly reconnectToken: string;
+}
+
+/** Quick-Play-Wartetimeout ohne Gegner (006, FR-016). */
+export interface QueueTimeoutMsg {
+  readonly reason: 'no-match';
+}
+
 // ── Client→Server Intent-Payloads ────────────────────────────────────────────
 
 export interface CreateLobbyPayload {
@@ -144,6 +163,8 @@ export const ClientEvents = {
   placeFleet: 'fleet:place',
   fireShot: 'shot:fire',
   reconnectResume: 'reconnect:resume',
+  queueJoin: 'queue:join',
+  queueLeave: 'queue:leave',
 } as const;
 
 export const ServerEvents = {
@@ -155,6 +176,8 @@ export const ServerEvents = {
   gameOver: 'game:over',
   opponentDisconnected: 'opponent:disconnected',
   opponentReconnected: 'opponent:reconnected',
+  queueMatched: 'queue:matched',
+  queueTimeout: 'queue:timeout',
   error: 'error',
 } as const;
 
@@ -163,3 +186,7 @@ export type CreateLobbyAck = Ack<{ code: string; lobby: LobbyView; reconnectToke
 export type JoinLobbyAck = Ack<{ lobby: LobbyView; reconnectToken: string }>;
 export type PlaceFleetAck = Ack<{ reason?: string }>;
 export type ReconnectResumeAck = Ack<{ you: PlayerId }>;
+export type QueueJoinAck = Ack<{ status: 'waiting' | 'matched' }>;
+export type QueueLeaveAck =
+  | { readonly ok: true }
+  | { readonly ok: false; readonly error: ErrorCode };
