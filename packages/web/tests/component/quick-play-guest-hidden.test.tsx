@@ -33,7 +33,15 @@ vi.mock('@/api/client', () => {
   class ApiError extends Error {}
   return {
     ApiError,
-    api: { me: vi.fn(), profile: vi.fn(), stats: vi.fn(), register: vi.fn(), login: vi.fn(), guest: vi.fn(), logout: vi.fn() },
+    api: {
+      me: vi.fn(),
+      profile: vi.fn(),
+      stats: vi.fn(),
+      register: vi.fn(),
+      login: vi.fn(),
+      guest: vi.fn(),
+      logout: vi.fn(),
+    },
   };
 });
 
@@ -57,7 +65,10 @@ describe('Quick Play (006): Gäste haben keinen Zugang (US3/FR-001)', () => {
 
   it('zeigt eingeloggten Spielern den „Match suchen"-Einstieg', async () => {
     (api.me as Mock).mockResolvedValue({ kind: 'user', displayName: 'Alice' });
-    (api.profile as Mock).mockResolvedValue({ displayName: 'Alice', stats: { gamesPlayed: 0, wins: 0, losses: 0, winRate: 0 } });
+    (api.profile as Mock).mockResolvedValue({
+      displayName: 'Alice',
+      stats: { gamesPlayed: 0, wins: 0, losses: 0, winRate: 0 },
+    });
 
     render(<OnlinePage />);
     await act(async () => h.fake.serverEmit('connect', undefined));

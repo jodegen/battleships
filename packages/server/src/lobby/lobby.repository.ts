@@ -95,7 +95,12 @@ export class LobbyRepository {
   // ── Reconnect: Terminal-Marker für verspäteten Wiedereintritt (005, FR-017) ──
 
   async setMatchResult(code: string, result: TerminalResult): Promise<void> {
-    await this.redis.client.set(matchResultKey(code), JSON.stringify(result), 'PX', MATCH_RESULT_TTL_MS);
+    await this.redis.client.set(
+      matchResultKey(code),
+      JSON.stringify(result),
+      'PX',
+      MATCH_RESULT_TTL_MS,
+    );
   }
   async getMatchResult(code: string): Promise<TerminalResult | null> {
     const raw = await this.redis.client.get(matchResultKey(code));

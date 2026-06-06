@@ -121,7 +121,7 @@ export function useOnlineGame(): OnlineGameApi {
     };
   }, []);
 
-  const emit = useCallback(async <T,>(event: string, payload: unknown): Promise<Ack<T>> => {
+  const emit = useCallback(async <T>(event: string, payload: unknown): Promise<Ack<T>> => {
     const socket = socketRef.current;
     if (!socket) return { ok: false, error: 'not-connected' } as Ack<T>;
     return (await socket.emitWithAck(event, payload)) as Ack<T>;
@@ -129,7 +129,10 @@ export function useOnlineGame(): OnlineGameApi {
 
   const createLobby = useCallback(
     async (settings: LobbySettings): Promise<string | null> => {
-      const ack = await emit<{ code: string; lobby: LobbyView; reconnectToken: string }>('lobby:create', { settings });
+      const ack = await emit<{ code: string; lobby: LobbyView; reconnectToken: string }>(
+        'lobby:create',
+        { settings },
+      );
       if (!ack.ok) {
         setState((s) => ({ ...s, error: ack.error }));
         return null;
@@ -144,7 +147,10 @@ export function useOnlineGame(): OnlineGameApi {
 
   const joinLobby = useCallback(
     async (code: string, guestName?: string): Promise<boolean> => {
-      const ack = await emit<{ lobby: LobbyView; reconnectToken: string }>('lobby:join', { code, guestName });
+      const ack = await emit<{ lobby: LobbyView; reconnectToken: string }>('lobby:join', {
+        code,
+        guestName,
+      });
       if (!ack.ok) {
         setState((s) => ({ ...s, error: ack.error }));
         return false;

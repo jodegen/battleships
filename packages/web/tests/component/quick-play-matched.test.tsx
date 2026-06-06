@@ -43,7 +43,15 @@ vi.mock('@/api/client', () => {
   class ApiError extends Error {}
   return {
     ApiError,
-    api: { me: vi.fn(), profile: vi.fn(), stats: vi.fn(), register: vi.fn(), login: vi.fn(), guest: vi.fn(), logout: vi.fn() },
+    api: {
+      me: vi.fn(),
+      profile: vi.fn(),
+      stats: vi.fn(),
+      register: vi.fn(),
+      login: vi.fn(),
+      guest: vi.fn(),
+      logout: vi.fn(),
+    },
   };
 });
 
@@ -54,8 +62,22 @@ function lobby(status: LobbyView['status']): LobbyView {
     status,
     settings: SETTINGS,
     players: [
-      { seat: 0, playerId: 'A', displayName: 'Alice', isGuest: false, connected: true, placed: false },
-      { seat: 1, playerId: 'B', displayName: 'Bob', isGuest: false, connected: true, placed: false },
+      {
+        seat: 0,
+        playerId: 'A',
+        displayName: 'Alice',
+        isGuest: false,
+        connected: true,
+        placed: false,
+      },
+      {
+        seat: 1,
+        playerId: 'B',
+        displayName: 'Bob',
+        isGuest: false,
+        connected: true,
+        placed: false,
+      },
     ],
     turn: null,
   };
@@ -63,7 +85,10 @@ function lobby(status: LobbyView['status']): LobbyView {
 
 beforeEach(() => {
   h.fake = new FakeSocket();
-  (api.profile as Mock).mockResolvedValue({ displayName: 'Alice', stats: { gamesPlayed: 0, wins: 0, losses: 0, winRate: 0 } });
+  (api.profile as Mock).mockResolvedValue({
+    displayName: 'Alice',
+    stats: { gamesPlayed: 0, wins: 0, losses: 0, winRate: 0 },
+  });
 });
 
 describe('Quick Play (006): „Match suchen" → nahtloser Übergang', () => {
@@ -82,7 +107,12 @@ describe('Quick Play (006): „Match suchen" → nahtloser Übergang', () => {
     expect(h.fake.emitted.find((e) => e.event === 'queue:join')).toBeUndefined(); // join geht über emitWithAck
 
     // Server paart → queue:matched: Lobby-Status placing wird sichtbar (kein paralleler Pfad, FR-007).
-    const matched: QueueMatchedMsg = { code: '7K3-Q9X', you: 'A', lobby: lobby('placing'), reconnectToken: 'rt-a' };
+    const matched: QueueMatchedMsg = {
+      code: '7K3-Q9X',
+      you: 'A',
+      lobby: lobby('placing'),
+      reconnectToken: 'rt-a',
+    };
     await act(async () => h.fake.serverEmit('queue:matched', matched));
 
     expect(await screen.findByText('7K3-Q9X')).toBeInTheDocument();

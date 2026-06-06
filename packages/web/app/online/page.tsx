@@ -33,7 +33,8 @@ export default function OnlinePage(): JSX.Element {
   const isGuest = identity?.kind === 'guest';
   const isLoggedIn = identity?.kind === 'user';
   const myName = identity && identity.kind !== 'anonymous' ? identity.displayName : null;
-  const you = game.view?.you ?? game.lobby?.players.find((p) => p.displayName === myName)?.playerId ?? null;
+  const you =
+    game.view?.you ?? game.lobby?.players.find((p) => p.displayName === myName)?.playerId ?? null;
   const myTurn = Boolean(game.view && game.lobby?.turn === game.view.you);
 
   const status = game.lobby?.status ?? null;
@@ -113,7 +114,11 @@ export default function OnlinePage(): JSX.Element {
                 : 'Gegner ist am Zug.'}{' '}
             {!game.over && <TurnTimer deadline={game.turnDeadline} />}
           </p>
-          <OnlineBoards view={game.view} canFire={myTurn && !game.over} onFire={(t) => void game.fireShot(t)} />
+          <OnlineBoards
+            view={game.view}
+            canFire={myTurn && !game.over}
+            onFire={(t) => void game.fireShot(t)}
+          />
         </section>
       )}
 

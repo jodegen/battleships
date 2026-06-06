@@ -30,7 +30,9 @@ export async function createWsApp(): Promise<WsContext> {
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
   const app = moduleRef.createNestApplication();
   app.use(cookieParser(process.env.COOKIE_SECRET));
-  app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
+  app.useGlobalPipes(
+    new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
+  );
 
   const redis = app.get(RedisService);
   // Tests laufen single-instance → Standard-Socket.IO-Adapter genügt. Der Redis-Pub/Sub-

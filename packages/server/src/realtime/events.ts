@@ -42,7 +42,9 @@ export type ErrorCode =
   | 'already-in-game'
   | 'internal-error';
 
-export type Ack<T> = ({ readonly ok: true } & T) | { readonly ok: false; readonly error: ErrorCode };
+export type Ack<T> =
+  | ({ readonly ok: true } & T)
+  | { readonly ok: false; readonly error: ErrorCode };
 
 // ── Server→Client Sichten ────────────────────────────────────────────────────
 
@@ -68,7 +70,10 @@ export interface LobbyView {
 export interface GameViewMsg {
   readonly code: string;
   readonly you: PlayerId;
-  readonly own: { readonly ships: ReadonlyArray<ShipPlacement>; readonly shotsReceived: ReadonlyArray<Coord> };
+  readonly own: {
+    readonly ships: ReadonlyArray<ShipPlacement>;
+    readonly shotsReceived: ReadonlyArray<Coord>;
+  };
   readonly opponentShots: ReadonlyArray<OpponentShotView>;
   readonly turn: PlayerId;
   readonly turnDeadline: number | null;
@@ -182,4 +187,6 @@ export type JoinLobbyAck = Ack<{ lobby: LobbyView; reconnectToken: string }>;
 export type PlaceFleetAck = Ack<{ reason?: string }>;
 export type ReconnectResumeAck = Ack<{ you: PlayerId }>;
 export type QueueJoinAck = Ack<{ status: 'waiting' | 'matched' }>;
-export type QueueLeaveAck = { readonly ok: true } | { readonly ok: false; readonly error: ErrorCode };
+export type QueueLeaveAck =
+  | { readonly ok: true }
+  | { readonly ok: false; readonly error: ErrorCode };

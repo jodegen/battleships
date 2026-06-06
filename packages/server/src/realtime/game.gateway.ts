@@ -81,7 +81,8 @@ export class GameGateway implements OnGatewayInit, OnGatewayDisconnect {
   @SubscribeMessage(ClientEvents.createLobby)
   async onCreate(socket: Socket, raw: unknown): Promise<CreateLobbyAck> {
     const identity = this.identityOf(socket);
-    if (identity.kind !== 'user') return { ok: false, error: identity.kind === 'guest' ? 'forbidden' : 'unauthenticated' };
+    if (identity.kind !== 'user')
+      return { ok: false, error: identity.kind === 'guest' ? 'forbidden' : 'unauthenticated' };
     const parsed = validatePayload(CreateLobbyDto, raw);
     if (!parsed.ok) return { ok: false, error: 'invalid-placement' };
 
@@ -90,12 +91,21 @@ export class GameGateway implements OnGatewayInit, OnGatewayDisconnect {
       turnTimerSeconds: parsed.value.settings.turnTimerSeconds ?? null,
       extraTurnOnHit: parsed.value.settings.extraTurnOnHit,
     };
-    const res = await this.lobby.createLobby({ userId: identity.userId, displayName: identity.displayName }, settings, this.now());
+    const res = await this.lobby.createLobby(
+      { userId: identity.userId, displayName: identity.displayName },
+      settings,
+      this.now(),
+    );
     if (!res.ok) return { ok: false, error: res.error };
 
     await socket.join(res.record.code);
     (socket.data as SocketData).lobby = { code: res.record.code, playerId: 'A' };
-    return { ok: true, code: res.record.code, lobby: toLobbyView(res.record), reconnectToken: tokenOf(res.record, 'A') };
+    return {
+      ok: true,
+      code: res.record.code,
+      lobby: toLobbyView(res.record),
+      reconnectToken: tokenOf(res.record, 'A'),
+    };
   }
 
   // ── US1: Lobby beitreten (FR-003) ────────────────────────────────────────────
@@ -106,7 +116,11 @@ export class GameGateway implements OnGatewayInit, OnGatewayDisconnect {
     const identity = this.identityOf(socket);
 
     const seat = this.resolveJoinIdentity(identity, parsed.value.guestName);
-    if (!seat) return { ok: false, error: identity.kind === 'anonymous' ? 'invalid-name' : 'unauthenticated' };
+    if (!seat)
+      return {
+        ok: false,
+        error: identity.kind === 'anonymous' ? 'invalid-name' : 'unauthenticated',
+      };
 
     const idKey = identity.kind === 'user' ? `user:${identity.userId}` : `conn:${socket.id}`;
     const res = await this.lobby.joinLobby(parsed.value.code, seat, idKey);
@@ -119,7 +133,8 @@ export class GameGateway implements OnGatewayInit, OnGatewayDisconnect {
   }
 
   private resolveJoinIdentity(identity: Identity, guestName?: string): SeatIdentity | null {
-    if (identity.kind === 'user') return { kind: 'user', userId: identity.userId, displayName: identity.displayName };
+    if (identity.kind === 'user')
+      return { kind: 'user', userId: identity.userId, displayName: identity.displayName };
     if (identity.kind === 'guest') return { kind: 'guest', displayName: identity.displayName };
     if (guestName) return { kind: 'guest', displayName: guestName.trim() };
     return null;
@@ -141,7 +156,10 @@ export class GameGateway implements OnGatewayInit, OnGatewayDisconnect {
 
     if (outcome.kind === 'waiting') {
       (socket.data as SocketData).inQueue = true;
-      this.matchmaking.scheduleWaitTimer(identity.userId, () => void this.onQueueTimeout(identity.userId, socket.id));
+      this.matchmaking.scheduleWaitTimer(
+        identity.userId,
+        () => void this.onQueueTimeout(identity.userId, socket.id),
+      );
       return { ok: true, status: 'waiting' };
     }
 
@@ -153,7 +171,10 @@ export class GameGateway implements OnGatewayInit, OnGatewayDisconnect {
       await this.matchmaking.discardMatch(code, outcome.hostUserId, identity.userId);
       await this.matchmaking.enqueueWaiting(identity, socket.id);
       (socket.data as SocketData).inQueue = true;
-      this.matchmaking.scheduleWaitTimer(identity.userId, () => void this.onQueueTimeout(identity.userId, socket.id));
+      this.matchmaking.scheduleWaitTimer(
+        identity.userId,
+        () => void this.onQueueTimeout(identity.userId, socket.id),
+      );
       return { ok: true, status: 'waiting' };
     }
 
@@ -210,8 +231,13 @@ export class GameGateway implements OnGatewayInit, OnGatewayDisconnect {
     const current = await this.repo.get(parsed.value.code);
     if (!current || current.status !== 'placing') return { ok: false, error: 'not-in-progress' };
 
-    const placements = parsed.value.placements.map((p) => ({ length: p.length, origin: { x: p.origin.x, y: p.origin.y }, orientation: p.orientation }));
-    if (!this.game.validateFleet(current, placements).ok) return { ok: false, error: 'invalid-placement' };
+    const placements = parsed.value.placements.map((p) => ({
+      length: p.length,
+      origin: { x: p.origin.x, y: p.origin.y },
+      orientation: p.orientation,
+    }));
+    if (!this.game.validateFleet(current, placements).ok)
+      return { ok: false, error: 'invalid-placement' };
 
     let started = false;
     const result = await this.repo.update(
@@ -262,7 +288,13 @@ export class GameGateway implements OnGatewayInit, OnGatewayDisconnect {
           captured = { kind: 'rejected', error: 'not-in-progress' };
           return rec;
         }
-        const app = this.game.applyShot(rec, seat.playerId, parsed.value.moveId, target, this.now());
+        const app = this.game.applyShot(
+          rec,
+          seat.playerId,
+          parsed.value.moveId,
+          target,
+          this.now(),
+        );
         captured = app;
         return app.kind === 'applied' ? app.record : rec;
       },
@@ -285,7 +317,11 @@ export class GameGateway implements OnGatewayInit, OnGatewayDisconnect {
 
     if (app.finished && app.winner) {
       this.timer.clear(result.record.code);
-      this.server.to(result.record.code).emit(ServerEvents.gameOver, { code: result.record.code, winner: app.winner, reason: 'all-sunk' });
+      this.server.to(result.record.code).emit(ServerEvents.gameOver, {
+        code: result.record.code,
+        winner: app.winner,
+        reason: 'all-sunk',
+      });
       await this.finishAndPersist(result.record, app.winner, 'FINISHED');
     } else {
       await this.emitGameViews(result.record);
@@ -354,7 +390,10 @@ export class GameGateway implements OnGatewayInit, OnGatewayDisconnect {
 
     // Sichtbaren Teilzustand AUSSCHLIESSLICH über viewFor wiederherstellen (FR-008/009/020).
     if (rec.game) {
-      socket.emit(ServerEvents.gameView, projectGameView(code, rec.game, seat.playerId, rec.turnDeadline));
+      socket.emit(
+        ServerEvents.gameView,
+        projectGameView(code, rec.game, seat.playerId, rec.turnDeadline),
+      );
     }
     this.broadcastLobbyState(rec);
     this.server.to(code).emit(ServerEvents.opponentReconnected, { code, playerId: seat.playerId });
@@ -435,9 +474,12 @@ export class GameGateway implements OnGatewayInit, OnGatewayDisconnect {
 
     if (paused && result.status === 'ok') {
       this.timer.clear(code);
-      const deadline = result.record.seats.find((s) => s.playerId === playerId)?.reconnectDeadline ?? this.now();
+      const deadline =
+        result.record.seats.find((s) => s.playerId === playerId)?.reconnectDeadline ?? this.now();
       this.grace.schedule(code, playerId, deadline, () => void this.onGraceExpired(code, playerId));
-      this.server.to(code).emit(ServerEvents.opponentDisconnected, { code, playerId, graceDeadline: deadline });
+      this.server
+        .to(code)
+        .emit(ServerEvents.opponentDisconnected, { code, playerId, graceDeadline: deadline });
       this.broadcastLobbyState(result.record);
       return;
     }
@@ -448,7 +490,9 @@ export class GameGateway implements OnGatewayInit, OnGatewayDisconnect {
       for (const s of pre?.seats ?? []) {
         if (s.identity.kind === 'user') await this.repo.clearUserGame(s.identity.userId);
       }
-      this.server.to(code).emit(ServerEvents.error, { error: 'lobby-not-found', message: 'Lobby geschlossen' });
+      this.server
+        .to(code)
+        .emit(ServerEvents.error, { error: 'lobby-not-found', message: 'Lobby geschlossen' });
       return;
     }
     if (result.status === 'ok') {
@@ -480,7 +524,11 @@ export class GameGateway implements OnGatewayInit, OnGatewayDisconnect {
   }
 
   // ── US6: Persistenz bei Partieende (FR-024–026) ──────────────────────────────
-  private async finishAndPersist(record: LobbyRecord, winner: PlayerId, status: 'FINISHED' | 'FORFEITED'): Promise<void> {
+  private async finishAndPersist(
+    record: LobbyRecord,
+    winner: PlayerId,
+    status: 'FINISHED' | 'FORFEITED',
+  ): Promise<void> {
     try {
       await this.matches.persistFinished(record, winner, status, this.now());
     } finally {
@@ -493,7 +541,8 @@ export class GameGateway implements OnGatewayInit, OnGatewayDisconnect {
         })
         .catch(() => undefined);
       const host = record.seats.find((s) => s.playerId === 'A');
-      if (host?.identity.kind === 'user') await this.repo.removeOpenLobby(host.identity.userId, record.code);
+      if (host?.identity.kind === 'user')
+        await this.repo.removeOpenLobby(host.identity.userId, record.code);
       // 006/FR-015: konto-weiten Aktiv-Index beider eingeloggter Sitze räumen → erneute Suche möglich.
       for (const s of record.seats) {
         if (s.identity.kind === 'user') await this.repo.clearUserGame(s.identity.userId);
@@ -514,7 +563,10 @@ export class GameGateway implements OnGatewayInit, OnGatewayDisconnect {
     for (const s of sockets) {
       const seat = (s.data as SocketData).lobby;
       if (!seat) continue;
-      s.emit(ServerEvents.gameView, projectGameView(record.code, record.game, seat.playerId, record.turnDeadline));
+      s.emit(
+        ServerEvents.gameView,
+        projectGameView(record.code, record.game, seat.playerId, record.turnDeadline),
+      );
     }
   }
 }

@@ -1,7 +1,15 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { resetDb } from './setup-app';
-import { connect, createWsApp, flushRedis, HAS_INFRA, registerCookie, waitFor, type WsContext } from './setup-ws';
+import {
+  connect,
+  createWsApp,
+  flushRedis,
+  HAS_INFRA,
+  registerCookie,
+  waitFor,
+  type WsContext,
+} from './setup-ws';
 
 // Kurzes Wartetimeout, damit der 120-s-Fall (FR-016) deterministisch und schnell testbar ist.
 // APP_CONFIG liest process.env beim App-Init (useFactory) → pro Datei überschreibbar; fileParallelism

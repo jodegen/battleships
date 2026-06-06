@@ -61,7 +61,12 @@ export class MatchmakingService {
     return `mm:${userId}`;
   }
   scheduleWaitTimer(userId: string, onExpire: () => void): void {
-    this.grace.schedule(this.timerCode(userId), 'A', this.now() + this.config.matchmakingTimeoutMs, onExpire);
+    this.grace.schedule(
+      this.timerCode(userId),
+      'A',
+      this.now() + this.config.matchmakingTimeoutMs,
+      onExpire,
+    );
   }
   clearWaitTimer(userId: string): void {
     this.grace.clear(this.timerCode(userId), 'A');
@@ -94,7 +99,11 @@ export class MatchmakingService {
   /** Reiht einen Nutzer als Wartenden ein (ZSET + conn). Für das Gateway (Geistermatch-Requeue). */
   async enqueueWaiting(identity: UserIdentity, socketId: string): Promise<void> {
     await this.repo.enqueue(identity.userId, this.now());
-    await this.repo.setConn(identity.userId, { socketId, displayName: identity.displayName }, this.connTtlMs());
+    await this.repo.setConn(
+      identity.userId,
+      { socketId, displayName: identity.displayName },
+      this.connTtlMs(),
+    );
   }
 
   /** Verwirft eine soeben erzeugte Lobby (Geistermatch) und räumt beide Aktiv-Indizes (FR-015). */
